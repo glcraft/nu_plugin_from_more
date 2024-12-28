@@ -981,8 +981,10 @@ name = "nu_plugin_from_advanced"
 version = "0.1.0"
 dependencies = [
  "kdl 6.1.0",
+ "miette 7.4.0",
  "nu-plugin",
  "nu-protocol",
+ "thiserror 2.0.9",
 ]
 
 [[package]]

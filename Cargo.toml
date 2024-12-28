@@ -7,3 +7,5 @@ edition = "2021"
 kdl = {version="6.1.0", features=["v1-fallback"]}
 nu-plugin = "0.101.0"
 nu-protocol = "0.101.0"
+thiserror = "2.0.9"
+miette = "7.4.0"
