@@ -1,0 +1,9 @@
+[package]
+name = "nu_plugin_from_advanced"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+kdl = {version="6.1.0", features=["v1-fallback"]}
+nu-plugin = "0.101.0"
+nu-protocol = "0.101.0"
