@@ -1,9 +1,9 @@
 mod from_kdl;
 use nu_plugin::{Plugin, PluginCommand};
 
-pub struct FromAdvPlugin;
+pub struct FromMorePlugin;
 
-impl Plugin for FromAdvPlugin {
+impl Plugin for FromMorePlugin {
     fn version(&self) -> String {
         env!("CARGO_PKG_VERSION").into()
     }
