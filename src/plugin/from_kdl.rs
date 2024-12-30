@@ -1,4 +1,4 @@
-use super::FromAdvPlugin;
+use super::FromMorePlugin;
 use kdl::{KdlDocument, KdlEntry, KdlNode, KdlValue};
 use miette::NarratableReportHandler;
 use nu_plugin::EvaluatedCall;
@@ -37,7 +37,7 @@ impl Error {
 pub struct FromKdl;
 
 impl SimplePluginCommand for FromKdl {
-    type Plugin = FromAdvPlugin;
+    type Plugin = FromMorePlugin;
 
     fn name(&self) -> &str {
         "from kdl"
@@ -54,7 +54,7 @@ impl SimplePluginCommand for FromKdl {
 
     fn run(
         &self,
-        _plugin: &FromAdvPlugin,
+        _plugin: &FromMorePlugin,
         _engine: &EngineInterface,
         call: &EvaluatedCall,
         input: &NuValue,
