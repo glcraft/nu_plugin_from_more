@@ -101,23 +101,29 @@ impl FromKdl {
             KdlValue::Null => NuValue::nothing(Span::unknown()),
         })
     }
-    fn convert_entries(kentries: &[KdlEntry]) -> ResultValue {
-        let nu_entries = kentries
+    fn convert_entries(kentries: &[KdlEntry]) -> Result<(Vec<NuValue>, Record), Error> {
+        let args_len = kentries
             .iter()
-            .map(|kentry| -> ResultValue {
-                let mut rec = Record::new();
-                rec.push(
-                    "name",
-                    kentry
-                        .name()
-                        .map(|ident| NuValue::string(ident.value().to_string(), Span::unknown()))
-                        .unwrap_or(NuValue::nothing(Span::unknown())),
-                );
-                rec.push("value", Self::convert_value(kentry.value())?);
-                Ok(NuValue::record(rec, Span::unknown()))
-            })
-            .collect::<Result<Vec<NuValue>, Error>>()?;
-        Ok(NuValue::list(nu_entries, Span::unknown()))
+            .filter(|entry| entry.name().is_some())
+            .count();
+        let props_len = kentries.len() - args_len;
+        let result = kentries.iter().fold(
+            (
+                Vec::with_capacity(args_len),
+                Record::with_capacity(props_len),
+            ),
+            |(mut args, mut props), entry| {
+                let value = Self::convert_value(entry.value()).unwrap();
+                match entry.name() {
+                    Some(name) => {
+                        props.insert(name.value(), value);
+                    }
+                    None => args.push(value),
+                }
+                (args, props)
+            },
+        );
+        Ok(result)
     }
     fn convert_document(kdoc: &KdlDocument) -> ResultValue {
         let nu_nodes = kdoc
@@ -134,7 +140,13 @@ impl FromKdl {
             NuValue::string(knode.name().value(), Span::unknown()),
         );
         if knode.entries().len() > 0 {
-            rec.push("entries", Self::convert_entries(knode.entries())?);
+            let (args, props) = Self::convert_entries(knode.entries())?;
+            if args.len() > 0 {
+                rec.push("arguments", NuValue::list(args, Span::unknown()))
+            }
+            if props.len() > 0 {
+                rec.push("properties", NuValue::record(props, Span::unknown()))
+            }
         }
         if let Some(kdoc) = knode.children() {
             rec.push("children", Self::convert_document(kdoc)?);
