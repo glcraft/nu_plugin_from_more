@@ -978,7 +978,7 @@ dependencies = [
 
 [[package]]
 name = "nu_plugin_from_more"
-version = "0.1.0"
+version = "0.1.1"
 dependencies = [
  "kdl 6.1.0",
  "miette 7.4.0",
