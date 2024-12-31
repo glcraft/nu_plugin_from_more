@@ -162,3 +162,32 @@ impl<'a> Lexer<'a> {
         todo!()
     }
 }
+
+#[cfg(test)]
+mod lexer_tests {
+    use super::Lexer;
+    #[test]
+    fn get_text_test() {
+        let mut lexer = Lexer::from("\"hello\"");
+        assert_eq!(lexer.next(), Some("\"hello\""));
+        assert_eq!(lexer.next(), None);
+    }
+    #[test]
+    fn get_spaced_text_test() {
+        let mut lexer = Lexer::from("   \"hello\"  ");
+        assert_eq!(lexer.next(), Some("\"hello\""));
+        assert_eq!(lexer.next(), None);
+    }
+    #[test]
+    fn get_wrong_text_test() {
+        let mut lexer = Lexer::from("\"hello");
+        assert_eq!(lexer.next(), Some("\"hello"));
+        assert_eq!(lexer.next(), None);
+    }
+    #[test]
+    fn get_text_escaped_test() {
+        let mut lexer = Lexer::from(r#""hello\"world""#);
+        assert_eq!(lexer.next(), Some(r#""hello\"world""#));
+        assert_eq!(lexer.next(), None);
+    }
+}
