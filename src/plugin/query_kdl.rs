@@ -104,7 +104,7 @@ struct Lexer<'a> {
     input: &'a str,
 }
 
-impl<'a, T: AsRef<str>> From<&'a T> for Lexer<'a> {
+impl<'a, T: AsRef<str> + ?Sized> From<&'a T> for Lexer<'a> {
     fn from(value: &'a T) -> Self {
         Self {
             input: value.as_ref(),
@@ -122,6 +122,7 @@ impl<'a> Iterator for Lexer<'a> {
             .take_while(|c| c.is_whitespace())
             .map(|c| c.len_utf8())
             .sum();
+
         self.input = &self.input[byte_offset..];
         let c_token = self.input.chars().next();
         match c_token {
@@ -134,8 +135,25 @@ impl<'a> Iterator for Lexer<'a> {
 }
 impl<'a> Lexer<'a> {
     fn get_text(&mut self) -> Option<<Self as Iterator>::Item> {
-        let iter_chars = self.input.chars();
-        todo!()
+        let mut iter_chars = self.input.chars();
+        let c_str = iter_chars.next().unwrap();
+        let mut escaped = false;
+        let mut len_str = c_str.len_utf8();
+        for c in iter_chars {
+            len_str += c.len_utf8();
+            if escaped {
+                escaped = false;
+                continue;
+            }
+            if c == '\\' {
+                escaped = true;
+            } else if c == c_str {
+                break;
+            }
+        }
+        let result = &self.input[0..len_str];
+        self.input = &self.input[len_str..];
+        Some(result)
     }
     fn get_alphanumeric(&mut self) -> Option<<Self as Iterator>::Item> {
         todo!()
