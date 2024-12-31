@@ -99,3 +99,22 @@ impl<'a> Path<'a> {
         todo!()
     }
 }
+
+struct Lexer<'a> {
+    input: &'a str,
+    cursor_offset: usize,
+}
+
+impl<'a> Iterator for Lexer<'a> {
+    type Item = &'a str;
+    fn next(&mut self) -> Option<Self::Item> {
+        // Skip whitespaces
+        self.cursor_offset += self
+            .input
+            .chars()
+            .skip(self.cursor_offset)
+            .take_while(|c| c.is_whitespace())
+            .count();
+        todo!()
+    }
+}
