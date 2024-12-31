@@ -189,62 +189,62 @@ impl<'a> Lexer<'a> {
 mod lexer_tests {
     use super::{Lexer, TokenType};
     #[test]
-    fn get_text_test() {
+    fn text() {
         let mut lexer = Lexer::from("\"hello\"");
         assert_eq!(lexer.next(), Some(TokenType::String("\"hello\"")));
         assert_eq!(lexer.next(), None);
     }
     #[test]
-    fn get_spaced_text_test() {
+    fn spaced_text() {
         let mut lexer = Lexer::from("   \"hello\"  ");
         assert_eq!(lexer.next(), Some(TokenType::String("\"hello\"")));
         assert_eq!(lexer.next(), None);
     }
     #[test]
-    fn get_wrong_text_test() {
+    fn wrong_text() {
         let mut lexer = Lexer::from("\"hello");
         assert_eq!(lexer.next(), Some(TokenType::String("\"hello")));
         assert_eq!(lexer.next(), None);
     }
     #[test]
-    fn get_text_escaped_test() {
+    fn text_escaped() {
         let mut lexer = Lexer::from(r#""hello\"world""#);
         assert_eq!(lexer.next(), Some(TokenType::String(r#""hello\"world""#)));
         assert_eq!(lexer.next(), None);
     }
     #[test]
-    fn get_multiple_text_test() {
+    fn multiple_text() {
         let mut lexer = Lexer::from(r#""hello" "world""#);
         assert_eq!(lexer.next(), Some(TokenType::String(r#""hello""#)));
         assert_eq!(lexer.next(), Some(TokenType::String(r#""world""#)));
         assert_eq!(lexer.next(), None);
     }
     #[test]
-    fn get_alpha_test() {
+    fn alpha() {
         let mut lexer = Lexer::from("abc");
         assert_eq!(lexer.next(), Some(TokenType::Alphanumeric("abc")));
         assert_eq!(lexer.next(), None);
     }
     #[test]
-    fn get_alphanumeric_test() {
+    fn alphanumeric() {
         let mut lexer = Lexer::from("abc123");
         assert_eq!(lexer.next(), Some(TokenType::Alphanumeric("abc123")));
         assert_eq!(lexer.next(), None);
     }
     #[test]
-    fn get_numeric_test() {
+    fn numeric() {
         let mut lexer = Lexer::from("123");
         assert_eq!(lexer.next(), Some(TokenType::Alphanumeric("123")));
         assert_eq!(lexer.next(), None);
     }
     #[test]
-    fn get_numalpha_test() {
+    fn numalpha() {
         let mut lexer = Lexer::from("123abc");
         assert_eq!(lexer.next(), Some(TokenType::Alphanumeric("123abc")));
         assert_eq!(lexer.next(), None);
     }
     #[test]
-    fn get_multiple_alpha_test() {
+    fn multiple_alpha() {
         let mut lexer = Lexer::from("abc def ghijk");
         assert_eq!(lexer.next(), Some(TokenType::Alphanumeric("abc")));
         assert_eq!(lexer.next(), Some(TokenType::Alphanumeric("def")));
@@ -252,7 +252,7 @@ mod lexer_tests {
         assert_eq!(lexer.next(), None);
     }
     #[test]
-    fn get_multiple_numeric_test() {
+    fn multiple_numeric() {
         let mut lexer = Lexer::from("123 456 10938");
         assert_eq!(lexer.next(), Some(TokenType::Alphanumeric("123")));
         assert_eq!(lexer.next(), Some(TokenType::Alphanumeric("456")));
@@ -260,7 +260,7 @@ mod lexer_tests {
         assert_eq!(lexer.next(), None);
     }
     #[test]
-    fn get_multiple_alphanumeric_test() {
+    fn multiple_alphanumeric() {
         let mut lexer = Lexer::from("abc 4476 ghijk 73ab35");
         assert_eq!(lexer.next(), Some(TokenType::Alphanumeric("abc")));
         assert_eq!(lexer.next(), Some(TokenType::Alphanumeric("4476")));
