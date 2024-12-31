@@ -178,7 +178,33 @@ impl<'a> Lexer<'a> {
         self.advance_and_return(len).map(TokenType::Alphanumeric)
     }
     fn get_token(&mut self) -> Option<<Self as Iterator>::Item> {
-        todo!()
+        use TokenType::*;
+        let mut iter_chars = self.input.chars().map(|c| (c.len_utf8(), c));
+        let (mut offset, c) = iter_chars.next()?;
+        let result = match c {
+            '/' => match iter_chars.next() {
+                Some((l, '/')) => {
+                    offset += l;
+                    DoubleSlash
+                }
+                Some(_) | None => Slash,
+            },
+            '[' => EnterSquareBracket,
+            ']' => LeaveSquareBracket,
+            '.' => match iter_chars.next() {
+                Some((l, '.')) => {
+                    offset += l;
+                    DoublePoint
+                }
+                Some(_) | None => Point,
+            },
+            '*' => Star,
+            '=' => Equal,
+            '|' => Pipe,
+            c => Unknown(&self.input[0..c.len_utf8()]),
+        };
+        self.input = &self.input[offset..];
+        Some(result)
     }
     #[inline]
     fn advance_and_return(&mut self, offset: usize) -> Option<&'a str> {
@@ -269,6 +295,45 @@ mod lexer_tests {
         assert_eq!(lexer.next(), Some(TokenType::Alphanumeric("4476")));
         assert_eq!(lexer.next(), Some(TokenType::Alphanumeric("ghijk")));
         assert_eq!(lexer.next(), Some(TokenType::Alphanumeric("73ab35")));
+        assert_eq!(lexer.next(), None);
+    }
+
+    #[test]
+    fn token_sqbrackets() {
+        let mut lexer = Lexer::from("[]");
+        assert_eq!(lexer.next(), Some(TokenType::EnterSquareBracket));
+        assert_eq!(lexer.next(), Some(TokenType::LeaveSquareBracket));
+        assert_eq!(lexer.next(), None);
+    }
+    #[test]
+    fn token_relatives() {
+        let mut lexer = Lexer::from("/./..//*");
+        assert_eq!(lexer.next(), Some(TokenType::Slash));
+        assert_eq!(lexer.next(), Some(TokenType::Point));
+        assert_eq!(lexer.next(), Some(TokenType::Slash));
+        assert_eq!(lexer.next(), Some(TokenType::DoublePoint));
+        assert_eq!(lexer.next(), Some(TokenType::DoubleSlash));
+        assert_eq!(lexer.next(), Some(TokenType::Star));
+        assert_eq!(lexer.next(), None);
+    }
+
+    #[test]
+    fn entries() {
+        let mut lexer = Lexer::from(r#"[name=value 1 "2" name1 = value1 | name = value1]"#);
+        assert_eq!(lexer.next(), Some(TokenType::EnterSquareBracket));
+        assert_eq!(lexer.next(), Some(TokenType::Alphanumeric("name")));
+        assert_eq!(lexer.next(), Some(TokenType::Equal));
+        assert_eq!(lexer.next(), Some(TokenType::Alphanumeric("value")));
+        assert_eq!(lexer.next(), Some(TokenType::Alphanumeric("1")));
+        assert_eq!(lexer.next(), Some(TokenType::String(r#""2""#)));
+        assert_eq!(lexer.next(), Some(TokenType::Alphanumeric("name1")));
+        assert_eq!(lexer.next(), Some(TokenType::Equal));
+        assert_eq!(lexer.next(), Some(TokenType::Alphanumeric("value1")));
+        assert_eq!(lexer.next(), Some(TokenType::Pipe));
+        assert_eq!(lexer.next(), Some(TokenType::Alphanumeric("name")));
+        assert_eq!(lexer.next(), Some(TokenType::Equal));
+        assert_eq!(lexer.next(), Some(TokenType::Alphanumeric("value1")));
+        assert_eq!(lexer.next(), Some(TokenType::LeaveSquareBracket));
         assert_eq!(lexer.next(), None);
     }
 }
