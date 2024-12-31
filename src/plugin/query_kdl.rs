@@ -102,19 +102,52 @@ impl<'a> Path<'a> {
 
 struct Lexer<'a> {
     input: &'a str,
-    cursor_offset: usize,
+    chars_cursor: usize,
+    bytes_cursor: usize,
+}
+
+impl<'a, T: AsRef<str>> From<&'a T> for Lexer<'a> {
+    fn from(value: &'a T) -> Self {
+        Self {
+            input: value.as_ref(),
+            chars_cursor: 0,
+            bytes_cursor: 0,
+        }
+    }
 }
 
 impl<'a> Iterator for Lexer<'a> {
     type Item = &'a str;
     fn next(&mut self) -> Option<Self::Item> {
         // Skip whitespaces
-        self.cursor_offset += self
+        (self.chars_cursor, self.bytes_cursor) = self
             .input
             .chars()
-            .skip(self.cursor_offset)
+            .skip(self.chars_cursor)
             .take_while(|c| c.is_whitespace())
-            .count();
+            .map(|c| c.len_utf8())
+            .fold(
+                (self.chars_cursor, self.bytes_cursor),
+                |(acc_c, acc_b), utf8len| (acc_c + 1, acc_b + utf8len),
+            );
+        let c_token = self.input.chars().skip(self.chars_cursor).next();
+        match c_token {
+            None => None,
+            Some('"' | '\'') => self.get_text(),
+            Some(c) if c.is_alphanumeric() => self.get_alphanumeric(),
+            Some(_) => self.get_token(),
+        }
+    }
+}
+impl<'a> Lexer<'a> {
+    fn get_text(&mut self) -> Option<<Self as Iterator>::Item> {
+        let iter_chars = self.input.chars().skip(self.chars_cursor);
+        todo!()
+    }
+    fn get_alphanumeric(&mut self) -> Option<<Self as Iterator>::Item> {
+        todo!()
+    }
+    fn get_token(&mut self) -> Option<<Self as Iterator>::Item> {
         todo!()
     }
 }
