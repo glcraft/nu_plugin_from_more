@@ -104,10 +104,13 @@ enum TokenType<'a> {
     String(&'a str),
     Alphanumeric(&'a str),
     Slash,
+    DoubleSlash,
     Point,
     DoublePoint,
+    Star,
     EnterSquareBracket,
     LeaveSquareBracket,
+    Equal,
     Pipe,
     Unknown(&'a str),
 }
