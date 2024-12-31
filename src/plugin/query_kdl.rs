@@ -4,6 +4,7 @@ use miette::NarratableReportHandler;
 use nu_plugin::EvaluatedCall;
 use nu_plugin::{EngineInterface, PluginCommand, SimplePluginCommand};
 use nu_protocol::{LabeledError, Record, Signature, Span, SyntaxShape, Type, Value as NuValue};
+use std::collections::HashMap;
 
 pub struct QueryKdl;
 
@@ -80,14 +81,10 @@ enum NodeIdentifier<'a> {
     Parent,
 }
 
-enum Entry<'a> {
-    Argument(&'a str),
-    Property(&'a str, &'a str),
-}
-
 struct Node<'a> {
     ident: NodeIdentifier<'a>,
-    entries: Vec<Entry<'a>>,
+    arguments: Vec<&'a str>,
+    properties: HashMap<&'a str, &'a str>,
 }
 
 struct Path<'a> {
