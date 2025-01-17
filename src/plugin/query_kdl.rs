@@ -6,6 +6,7 @@ use miette::NarratableReportHandler;
 use nu_plugin::EvaluatedCall;
 use nu_plugin::{EngineInterface, PluginCommand, SimplePluginCommand};
 use nu_protocol::{LabeledError, Record, Signature, Span, SyntaxShape, Type, Value as NuValue};
+use query_kdl::Path;
 use std::collections::HashMap;
 
 pub struct QueryKdl;
