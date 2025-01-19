@@ -90,7 +90,7 @@ impl<'a> Lexer<'a> {
         let len = self
             .input
             .chars()
-            .take_while(|c| c.is_alphanumeric())
+            .take_while(|c| c.is_alphanumeric() || *c == '_')
             .map(char::len_utf8)
             .sum();
         self.advance_and_return(len).map(TokenType::Alphanumeric)
