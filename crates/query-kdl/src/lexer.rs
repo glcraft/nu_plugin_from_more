@@ -14,6 +14,25 @@ pub enum TokenType<'a> {
     Unknown(&'a str),
 }
 
+impl<'a> std::fmt::Display for TokenType<'a> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            TokenType::String(v) => write!(f, "{}", v),
+            TokenType::Alphanumeric(v) => write!(f, "{}", v),
+            TokenType::Slash => write!(f, "/"),
+            TokenType::DoubleSlash => write!(f, "//"),
+            TokenType::Point => write!(f, "."),
+            TokenType::DoublePoint => write!(f, ".."),
+            TokenType::Star => write!(f, "*"),
+            TokenType::EnterSquareBracket => write!(f, "["),
+            TokenType::LeaveSquareBracket => write!(f, "]"),
+            TokenType::Equal => write!(f, "="),
+            TokenType::Pipe => write!(f, "|"),
+            TokenType::Unknown(v) => write!(f, "<unknown: {}>", v),
+        }
+    }
+}
+
 pub struct Lexer<'a> {
     input: &'a str,
 }
