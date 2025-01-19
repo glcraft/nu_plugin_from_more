@@ -1,3 +1,5 @@
+mod lexer;
+mod parser;
 use super::FromMorePlugin;
 use kdl::{KdlDocument, KdlEntry, KdlNode, KdlValue};
 use miette::NarratableReportHandler;
@@ -52,7 +54,7 @@ impl SimplePluginCommand for QueryKdl {
                 query_span,
             ));
         };
-        let query = Path::parse(&query_str).map_err(|e| {
+        let query = parser::Path::parse(&query_str).map_err(|e| {
             LabeledError::new("Failed to parse query").with_label(e.to_string(), query_span)
         })?;
 
