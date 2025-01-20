@@ -19,7 +19,7 @@ pub enum NodeIdentifier<'a> {
 #[derive(Clone, PartialEq, Eq, Debug)]
 pub struct Node<'a> {
     ident: NodeIdentifier<'a>,
-    entries: Entries<'a>,
+    entries: Option<Entries<'a>>,
 }
 #[derive(Clone, PartialEq, Eq, Debug)]
 struct Entries<'a> {
@@ -31,7 +31,7 @@ impl<'a> Entries<'a> {
     pub fn new() -> Self {
         Default::default()
     }
-    fn parse_lexer(lexer: &mut Lexer<'a>) -> Result<'a, Self> {
+    fn parse_lexer(lexer: &mut impl Iterator<Item = TokenType<'a>>) -> Result<'a, Self> {
         let mut args = vec![];
         let mut props = HashMap::new();
         let mut prop_name = None;
@@ -92,13 +92,15 @@ pub enum ParseQueryError<'a> {
     DoubleEqual,
     #[error("missing property name")]
     MissingPropertyName,
+    #[error("markers like root or anywhere can't have entries")]
+    EntriesOnMarker,
 }
 
 type Result<'a, T> = std::result::Result<T, ParseQueryError<'a>>;
 
 impl<'a> Path<'a> {
     pub fn parse(input: &'a str) -> Result<'a, Self> {
-        let mut lexer = Lexer::from(input);
+        let mut lexer = Lexer::from(input).peekable();
         let mut nodes = Vec::new();
 
         let first_node = match lexer.next() {
@@ -112,11 +114,17 @@ impl<'a> Path<'a> {
             Some(v) => return Err(ParseQueryError::UnexpectedToken(v)),
         };
 
-        let first_entries = match lexer.next() {
-            None | Some(TokenType::Slash) => Entries::new(),
-            Some(TokenType::EnterSquareBracket) => Entries::parse_lexer(&mut lexer)?,
-            Some(t) => return Err(ParseQueryError::UnexpectedToken(t)),
+        let first_entries = if matches!(lexer.peek(), Some(TokenType::EnterSquareBracket)) {
+            if matches!(first_node, NodeIdentifier::Root | NodeIdentifier::Anywhere) {
+                return Err(ParseQueryError::EntriesOnMarker);
+            }
+            Some(Entries::parse_lexer(&mut lexer)?)
+        } else {
+            None
         };
+        if matches!(lexer.peek(), Some(TokenType::Slash)) {
+            lexer.next();
+        }
 
         nodes.push(Node {
             ident: first_node,
@@ -132,8 +140,8 @@ impl<'a> Path<'a> {
                 None => break,
             };
             let entries = match lexer.next() {
-                None | Some(TokenType::Slash) => Entries::new(),
-                Some(TokenType::EnterSquareBracket) => Entries::parse_lexer(&mut lexer)?,
+                None | Some(TokenType::Slash) => None,
+                Some(TokenType::EnterSquareBracket) => Some(Entries::parse_lexer(&mut lexer)?),
                 Some(t) => return Err(ParseQueryError::UnexpectedToken(t)),
             };
             nodes.push(Node {
@@ -176,7 +184,7 @@ mod tests {
     fn node_ident_only<'a>(ident: NodeIdentifier<'a>) -> Node<'a> {
         Node {
             ident,
-            entries: Entries::new(),
+            entries: None,
         }
     }
 
