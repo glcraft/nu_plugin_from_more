@@ -29,6 +29,11 @@ struct Entries<'a> {
 
 impl<'a> Entries<'a> {
     pub fn new() -> Self {
+        Default::default()
+    }
+}
+impl<'a> Default for Entries<'a> {
+    fn default() -> Self {
         Self {
             arguments: Vec::new(),
             properties: HashMap::new(),
@@ -200,7 +205,7 @@ mod tests {
     }
 
     #[test]
-    fn path_name() {
+    fn path_named() {
         assert_eq!(
             Path::parse("node_name"),
             Ok(Path {
@@ -208,6 +213,36 @@ mod tests {
                     ident: NodeIdentifier::Named("node_name"),
                     entries: Entries::new()
                 }]
+            })
+        );
+        assert_eq!(
+            Path::parse("node1/node2"),
+            Ok(Path {
+                nodes: vec![
+                    Node {
+                        ident: NodeIdentifier::Named("node1"),
+                        entries: Entries::new()
+                    },
+                    Node {
+                        ident: NodeIdentifier::Named("node2"),
+                        entries: Entries::new()
+                    }
+                ]
+            })
+        );
+        assert_eq!(
+            Path::parse(r#""node 1"/"node 2""#),
+            Ok(Path {
+                nodes: vec![
+                    Node {
+                        ident: NodeIdentifier::Named("node 1"),
+                        entries: Entries::new()
+                    },
+                    Node {
+                        ident: NodeIdentifier::Named("node 2"),
+                        entries: Entries::new()
+                    }
+                ]
             })
         )
     }
