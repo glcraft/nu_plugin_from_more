@@ -215,13 +215,17 @@ mod tests {
     }
 
     #[test]
-    fn path_named() {
+    fn path_named_one() {
         assert_eq!(
             Path::parse("node_name"),
             Ok(Path {
                 nodes: vec![node_ident_only(NodeIdentifier::Named("node_name"))]
             })
         );
+    }
+
+    #[test]
+    fn path_named_multi() {
         assert_eq!(
             Path::parse("node1/node2"),
             Ok(Path {
@@ -231,6 +235,10 @@ mod tests {
                 ]
             })
         );
+    }
+
+    #[test]
+    fn path_named_strings() {
         assert_eq!(
             Path::parse(r#""node 1"/"node 2""#),
             Ok(Path {
@@ -241,9 +249,8 @@ mod tests {
             })
         );
     }
-
     #[test]
-    fn path_ident() {
+    fn path_ident_root() {
         assert_eq!(
             Path::parse(r#"/node1"#),
             Ok(Path {
@@ -254,6 +261,20 @@ mod tests {
             })
         );
         assert_eq!(
+            Path::parse(r#"/node1/node2"#),
+            Ok(Path {
+                nodes: vec![
+                    node_ident_only(NodeIdentifier::Root),
+                    node_ident_only(NodeIdentifier::Named("node1")),
+                    node_ident_only(NodeIdentifier::Named("node2"))
+                ]
+            })
+        );
+    }
+
+    #[test]
+    fn path_ident_anywhere() {
+        assert_eq!(
             Path::parse(r#"//node1"#),
             Ok(Path {
                 nodes: vec![
@@ -262,6 +283,10 @@ mod tests {
                 ]
             })
         );
+    }
+
+    #[test]
+    fn path_ident_any() {
         assert_eq!(
             Path::parse(r#"/*/node1"#),
             Ok(Path {
