@@ -241,4 +241,36 @@ mod tests {
             })
         );
     }
+
+    #[test]
+    fn path_ident() {
+        assert_eq!(
+            Path::parse(r#"/node1"#),
+            Ok(Path {
+                nodes: vec![
+                    node_ident_only(NodeIdentifier::Root),
+                    node_ident_only(NodeIdentifier::Named("node1"))
+                ]
+            })
+        );
+        assert_eq!(
+            Path::parse(r#"//node1"#),
+            Ok(Path {
+                nodes: vec![
+                    node_ident_only(NodeIdentifier::Anywhere),
+                    node_ident_only(NodeIdentifier::Named("node1"))
+                ]
+            })
+        );
+        assert_eq!(
+            Path::parse(r#"/*/node1"#),
+            Ok(Path {
+                nodes: vec![
+                    node_ident_only(NodeIdentifier::Root),
+                    node_ident_only(NodeIdentifier::Any),
+                    node_ident_only(NodeIdentifier::Named("node1"))
+                ]
+            })
+        );
+    }
 }
