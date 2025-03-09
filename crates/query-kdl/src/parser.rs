@@ -313,7 +313,7 @@ mod tests {
             Ok(Path {
                 nodes: vec![
                     node_ident_only(NodeIdentifier::Root),
-                    node_ident_only(NodeIdentifier::Any),
+                    node_ident_only(NodeIdentifier::Parent),
                     node_ident_only(NodeIdentifier::Named("node1"))
                 ]
             })
