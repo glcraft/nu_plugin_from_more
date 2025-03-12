@@ -2,8 +2,8 @@ use std::collections::HashMap;
 
 use crate::lexer::{Lexer, TokenType};
 
-#[derive(Clone, PartialEq, Eq, Debug)]
-pub enum NodeIdentifier<'a> {
+#[derive(Clone, PartialEq, Debug)]
+pub enum Selector<'a> {
     /// "<name>" Node with a name
     Named(&'a str),
     /// "*" Any nodes in the current scope
@@ -14,13 +14,18 @@ pub enum NodeIdentifier<'a> {
     Anywhere,
     /// ".." Parent node
     Parent,
+    /// entry selector
+    Entries(Entries<'a>),
+    /// ranged or indexed selection
+    Ranged(i32, Option<i32>),
+    /// Integer
+    Integer(i64),
+    /// Floating point
+    FloatingPoing(f64),
 }
 
-#[derive(Clone, PartialEq, Eq, Debug)]
-pub struct Node<'a> {
-    ident: NodeIdentifier<'a>,
-    entries: Option<Entries<'a>>,
-}
+type Selectors<'a> = Vec<Selector<'a>>;
+
 #[derive(Clone, PartialEq, Eq, Debug)]
 struct Entries<'a> {
     arguments: Vec<&'a str>,
@@ -39,7 +44,7 @@ impl<'a> Entries<'a> {
             let val = match token {
                 TokenType::LeaveSquareBracket => break,
                 TokenType::Alphanumeric(s) => s,
-                t @ TokenType::String(_) => parse_string(t)?,
+                TokenType::String(s) => Path::parse_string(s)?,
                 TokenType::Equal => {
                     if prop_name.is_some() {
                         return Err(ParseQueryError::DoubleEqual);
@@ -77,17 +82,19 @@ impl<'a> Default for Entries<'a> {
     }
 }
 
-#[derive(Clone, PartialEq, Eq, Debug)]
+#[derive(Clone, PartialEq, Debug)]
 pub struct Path<'a> {
-    nodes: Vec<Node<'a>>,
+    nodes: Selectors<'a>,
 }
 
-#[derive(thiserror::Error, PartialEq, Eq, Debug)]
+#[derive(thiserror::Error, PartialEq, Debug)]
 pub enum ParseQueryError<'a> {
     #[error("unexpected token: {0}")]
     UnexpectedToken(TokenType<'a>),
     #[error("malformed string (missing \"): {0}")]
-    MalformedString(TokenType<'a>),
+    MalformedString(&'a str),
+    #[error("malformed number: {0}")]
+    MalformedNumber(&'a str),
     #[error("double equal in entries")]
     DoubleEqual,
     #[error("missing property name")]
@@ -103,90 +110,76 @@ impl<'a> Path<'a> {
         let mut lexer = Lexer::from(input).peekable();
         let mut nodes = Vec::new();
 
-        let first_node = match lexer.next() {
-            None => return Ok(Path { nodes: vec![] }),
-            Some(TokenType::Slash) => NodeIdentifier::Root,
-            Some(TokenType::Star) => NodeIdentifier::Any,
-            Some(TokenType::DoubleSlash) => NodeIdentifier::Anywhere,
-            Some(TokenType::DoublePoint) => NodeIdentifier::Parent,
-            Some(t @ TokenType::String(_)) => NodeIdentifier::Named(parse_string(t)?),
-            Some(TokenType::Alphanumeric(s)) => NodeIdentifier::Named(s),
-            Some(v) => return Err(ParseQueryError::UnexpectedToken(v)),
-        };
-
-        let first_entries = if matches!(lexer.peek(), Some(TokenType::EnterSquareBracket)) {
-            if matches!(first_node, NodeIdentifier::Root | NodeIdentifier::Anywhere) {
-                return Err(ParseQueryError::EntriesOnMarker);
-            }
-            Some(Entries::parse_lexer(&mut lexer)?)
-        } else {
-            None
-        };
-        if matches!(lexer.peek(), Some(TokenType::Slash)) {
-            lexer.next();
-        }
-
-        nodes.push(Node {
-            ident: first_node,
-            entries: first_entries,
-        });
         loop {
-            let node = match lexer.next() {
-                Some(TokenType::Star) => NodeIdentifier::Any,
-                Some(TokenType::DoublePoint) => NodeIdentifier::Parent,
-                Some(t @ TokenType::String(_)) => NodeIdentifier::Named(parse_string(t)?),
-                Some(TokenType::Alphanumeric(s)) => NodeIdentifier::Named(s),
-                Some(t) => return Err(ParseQueryError::UnexpectedToken(t)),
-                None => break,
+            let Some(token) = lexer.next() else {
+                break;
             };
-            let entries = match lexer.next() {
-                None | Some(TokenType::Slash) => None,
-                Some(TokenType::EnterSquareBracket) => Some(Entries::parse_lexer(&mut lexer)?),
-                Some(t) => return Err(ParseQueryError::UnexpectedToken(t)),
+            let selector = match token {
+                TokenType::Slash => {
+                    if nodes.is_empty() {
+                        Selector::Root
+                    } else {
+                        continue;
+                    }
+                }
+                TokenType::DoubleSlash => {
+                    if nodes.is_empty() {
+                        Selector::Anywhere
+                    } else {
+                        return Err(ParseQueryError::UnexpectedToken(token));
+                    }
+                }
+                TokenType::Star => Selector::Any,
+                TokenType::DoublePoint => Selector::Parent,
+                TokenType::String(s) => Selector::Named(Self::parse_string(s)?),
+                TokenType::Alphanumeric(s) => todo!(),
+                TokenType::EnterSquareBracket => {
+                    Selector::Entries(Entries::parse_lexer(&mut lexer)?)
+                }
+                TokenType::EnterCurlyBracket => todo!(),
+                _ => return Err(ParseQueryError::UnexpectedToken(token)),
             };
-            nodes.push(Node {
-                ident: node,
-                entries,
-            });
+            nodes.push(selector);
         }
-        Ok(Path { nodes })
-    }
-}
 
-fn parse_string<'a>(t: TokenType<'a>) -> Result<'a, &'a str> {
-    let TokenType::String(s) = t else {
-        return Err(ParseQueryError::UnexpectedToken(t));
-    };
-    match s.chars().next() {
-        None => return Err(ParseQueryError::MalformedString(t)),
-        Some(c) if c != '"' => return Err(ParseQueryError::MalformedString(t)),
-        Some(_) => (),
+        return Ok(Self { nodes });
     }
+    fn parse_string<'b>(s: &'b str) -> Result<'b, &'b str> {
+        match s.chars().next() {
+            None => return Err(ParseQueryError::MalformedString(s)),
+            Some(c) if c != '"' => return Err(ParseQueryError::MalformedString(s)),
+            Some(_) => (),
+        }
 
-    match s.chars().last() {
-        None => unreachable!(),
-        Some(c) if c != '"' => return Err(ParseQueryError::MalformedString(t)),
-        Some(_) => (),
+        match s.chars().last() {
+            None => unreachable!(),
+            Some(c) if c != '"' => return Err(ParseQueryError::MalformedString(s)),
+            Some(_) => (),
+        }
+        // TODO: Convert escaped characters, output a Cow string
+        return Ok(&s[1..s.len() - 1]);
     }
-    // TODO: Convert escaped characters, output a Cow string
-    return Ok(&s[1..s.len() - 1]);
+    fn parse_alphanumeric(input: &'a str) -> Result<'a, Selector<'a>> {
+        let (n_points, hexa, other) = input.chars().fold(
+            (0u32, false, false),
+            |acc @ (n_points, hexa, other), c| match c {
+                '-' | '0'..'9' => acc,
+                '.' => (n_points + 1, hexa, other),
+                'a'..'f' | 'A'..'F' => (n_points, true, other),
+                _ => (n_points, hexa, true),
+            },
+        );
+        todo!()
+    }
 }
 
 #[cfg(test)]
 mod tests {
     use crate::{
         lexer::{Lexer, TokenType},
-        parser::{parse_string, Entries, Node, NodeIdentifier, ParseQueryError, Path},
+        parser::{Entries, ParseQueryError, Path, Selector},
         util::hashmap,
     };
-
-    #[inline]
-    fn node_ident_only<'a>(ident: NodeIdentifier<'a>) -> Node<'a> {
-        Node {
-            ident,
-            entries: None,
-        }
-    }
 
     #[test]
     fn parser_strings() {
@@ -194,15 +187,13 @@ mod tests {
             let mut lexer = Lexer::from(input);
             let token = lexer.next();
             assert_eq!(token, Some(TokenType::String(input)));
-            assert_eq!(parse_string(token.unwrap()), output);
+            assert_eq!(Path::parse_string(input), output);
         }
         test_string("\"hello\"", Ok("hello"));
         test_string("\"hello world\"", Ok("hello world"));
         test_string(
             "\"hello world",
-            Err(ParseQueryError::MalformedString(TokenType::String(
-                "\"hello world",
-            ))),
+            Err(ParseQueryError::MalformedString("\"hello world")),
         );
     }
     #[test]
@@ -227,7 +218,7 @@ mod tests {
         assert_eq!(
             Path::parse("node_name"),
             Ok(Path {
-                nodes: vec![node_ident_only(NodeIdentifier::Named("node_name"))]
+                nodes: vec![Selector::Named("node_name")]
             })
         );
     }
@@ -237,10 +228,7 @@ mod tests {
         assert_eq!(
             Path::parse("node1/node2"),
             Ok(Path {
-                nodes: vec![
-                    node_ident_only(NodeIdentifier::Named("node1")),
-                    node_ident_only(NodeIdentifier::Named("node2"))
-                ]
+                nodes: vec![Selector::Named("node1"), Selector::Named("node2")]
             })
         );
     }
@@ -250,10 +238,7 @@ mod tests {
         assert_eq!(
             Path::parse(r#""node 1"/"node 2""#),
             Ok(Path {
-                nodes: vec![
-                    node_ident_only(NodeIdentifier::Named("node 1")),
-                    node_ident_only(NodeIdentifier::Named("node 2"))
-                ]
+                nodes: vec![Selector::Named("node 1"), Selector::Named("node 2")]
             })
         );
     }
@@ -262,19 +247,16 @@ mod tests {
         assert_eq!(
             Path::parse(r#"/node1"#),
             Ok(Path {
-                nodes: vec![
-                    node_ident_only(NodeIdentifier::Root),
-                    node_ident_only(NodeIdentifier::Named("node1"))
-                ]
+                nodes: vec![Selector::Root, Selector::Named("node1")]
             })
         );
         assert_eq!(
             Path::parse(r#"/node1/node2"#),
             Ok(Path {
                 nodes: vec![
-                    node_ident_only(NodeIdentifier::Root),
-                    node_ident_only(NodeIdentifier::Named("node1")),
-                    node_ident_only(NodeIdentifier::Named("node2"))
+                    Selector::Root,
+                    Selector::Named("node1"),
+                    Selector::Named("node2")
                 ]
             })
         );
@@ -285,10 +267,7 @@ mod tests {
         assert_eq!(
             Path::parse(r#"//node1"#),
             Ok(Path {
-                nodes: vec![
-                    node_ident_only(NodeIdentifier::Anywhere),
-                    node_ident_only(NodeIdentifier::Named("node1"))
-                ]
+                nodes: vec![Selector::Anywhere, Selector::Named("node1")]
             })
         );
     }
@@ -298,11 +277,7 @@ mod tests {
         assert_eq!(
             Path::parse(r#"/*/node1"#),
             Ok(Path {
-                nodes: vec![
-                    node_ident_only(NodeIdentifier::Root),
-                    node_ident_only(NodeIdentifier::Any),
-                    node_ident_only(NodeIdentifier::Named("node1"))
-                ]
+                nodes: vec![Selector::Root, Selector::Any, Selector::Named("node1")]
             })
         );
     }
@@ -311,13 +286,30 @@ mod tests {
         assert_eq!(
             Path::parse(r#"/../node1"#),
             Ok(Path {
-                nodes: vec![
-                    node_ident_only(NodeIdentifier::Root),
-                    node_ident_only(NodeIdentifier::Parent),
-                    node_ident_only(NodeIdentifier::Named("node1"))
-                ]
+                nodes: vec![Selector::Root, Selector::Parent, Selector::Named("node1")]
             })
         );
+    }
+    #[test]
+    fn alphanum() {
+        use {ParseQueryError::*, Selector::*};
+        let parse = Path::parse_alphanumeric;
+        assert_eq!(parse("123"), Ok(Integer(123)));
+        assert_eq!(parse("-123"), Ok(Integer(-123)));
+        assert_eq!(parse("0x123"), Ok(Integer(0x123)));
+        assert_eq!(parse("0b101"), Ok(Integer(0b101)));
+        assert_eq!(parse("0o123"), Ok(Integer(0o123)));
+        assert_eq!(parse("-0x123"), Ok(Integer(-0x123)));
+        assert_eq!(parse("-0b101"), Ok(Integer(-0b101)));
+        assert_eq!(parse("-0o123"), Ok(Integer(-0o123)));
+        assert_eq!(parse("1.23"), Ok(FloatingPoing(1.23)));
+        assert_eq!(parse("-1.23"), Ok(FloatingPoing(-1.23)));
+        assert_eq!(parse("1.2.3"), Err(MalformedNumber("1.2.3")));
+        assert_eq!(parse("-1.2.3"), Err(MalformedNumber("-1.2.3")));
+        assert_eq!(parse("1c0"), Err(MalformedNumber("1c0")));
+        assert_eq!(parse("-1c0"), Err(MalformedNumber("-1c0")));
+        assert_eq!(parse("abc"), Ok(Named("abc")));
+        assert_eq!(parse("-abc"), Ok(Named("-abc")));
     }
     // #[test]
 }
