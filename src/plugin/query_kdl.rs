@@ -6,7 +6,7 @@ use miette::NarratableReportHandler;
 use nu_plugin::EvaluatedCall;
 use nu_plugin::{EngineInterface, PluginCommand, SimplePluginCommand};
 use nu_protocol::{LabeledError, Record, Signature, Span, SyntaxShape, Type, Value as NuValue};
-use query_kdl::Path;
+// use query_kdl::Path;
 use std::collections::HashMap;
 
 pub struct QueryKdl;
@@ -54,17 +54,17 @@ impl SimplePluginCommand for QueryKdl {
                 query_span,
             ));
         };
-        let query = parser::Path::parse(&query_str).map_err(|e| {
-            LabeledError::new("Failed to parse query").with_label(e.to_string(), query_span)
-        })?;
+        // let query = parser::Path::parse(&query_str).map_err(|e| {
+        //     LabeledError::new("Failed to parse query").with_label(e.to_string(), query_span)
+        // })?;
 
-        let kdoc = match KdlDocument::parse(input) {
-            Ok(v) => v,
-            Err(e) => {
-                return Err(LabeledError::new("Failed to parse KDL format")
-                    .with_label(e.to_string(), call.head))
-            }
-        };
+        // let kdoc = match KdlDocument::parse(input) {
+        //     Ok(v) => v,
+        //     Err(e) => {
+        //         return Err(LabeledError::new("Failed to parse KDL format")
+        //             .with_label(e.to_string(), call.head))
+        //     }
+        // };
         todo!()
     }
 }
