@@ -160,16 +160,38 @@ impl<'a> Path<'a> {
         return Ok(&s[1..s.len() - 1]);
     }
     fn parse_alphanumeric(input: &'a str) -> Result<'a, Selector<'a>> {
-        let (n_points, hexa, other) = input.chars().fold(
-            (0u32, false, false),
-            |acc @ (n_points, hexa, other), c| match c {
-                '-' | '0'..'9' => acc,
-                '.' => (n_points + 1, hexa, other),
-                'a'..'f' | 'A'..'F' => (n_points, true, other),
-                _ => (n_points, hexa, true),
-            },
-        );
-        todo!()
+        let (sign, input2) = match input.chars().next() {
+            None => unreachable!(),
+            Some('-') => (-1, &input[1..]),
+            Some('+') => (1, &input[1..]),
+            Some(_) => (1, input),
+        };
+
+        let into_integer = |radix: std::result::Result<i64, std::num::ParseIntError>| {
+            radix
+                .map(|v| Selector::Integer(v * sign))
+                .map_err(|_| ParseQueryError::MalformedNumber(input))
+        };
+
+        let result = if input2.starts_with("0x") {
+            into_integer(i64::from_str_radix(&input2[2..], 16))?
+        } else if input2.starts_with("0o") {
+            into_integer(i64::from_str_radix(&input2[2..], 8))?
+        } else if input2.starts_with("0b") {
+            into_integer(i64::from_str_radix(&input2[2..], 2))?
+        } else if input2.chars().next().map(char::is_numeric) == Some(true) {
+            match input2.chars().filter(|c| *c == '.').count() {
+                0 => into_integer(i64::from_str_radix(input2, 10))?,
+                1 => input
+                    .parse()
+                    .map(Selector::FloatingPoing)
+                    .map_err(|_| ParseQueryError::MalformedNumber(input))?,
+                _ => return Err(ParseQueryError::MalformedNumber(input)),
+            }
+        } else {
+            Selector::Named(input)
+        };
+        Ok(result)
     }
 }
 
