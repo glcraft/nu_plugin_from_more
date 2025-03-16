@@ -28,8 +28,8 @@ impl<'a> std::fmt::Display for TokenType<'a> {
             TokenType::Star => write!(f, "*"),
             TokenType::EnterSquareBracket => write!(f, "["),
             TokenType::LeaveSquareBracket => write!(f, "]"),
-            TokenType::EnterCurlyBracket => write!(f, "{"),
-            TokenType::LeaveCurlyBracket => write!(f, "}"),
+            TokenType::EnterCurlyBracket => write!(f, "{{"),
+            TokenType::LeaveCurlyBracket => write!(f, "}}"),
             TokenType::Equal => write!(f, "="),
             TokenType::Pipe => write!(f, "|"),
             TokenType::Unknown(v) => write!(f, "<unknown: {}>", v),
@@ -113,6 +113,8 @@ impl<'a> Lexer<'a> {
             },
             '[' => EnterSquareBracket,
             ']' => LeaveSquareBracket,
+            '{' => EnterCurlyBracket,
+            '}' => LeaveCurlyBracket,
             '.' => match iter_chars.next() {
                 Some((l, '.')) => {
                     offset += l;
@@ -256,6 +258,22 @@ mod tests {
         assert_eq!(lexer.next(), Some(TokenType::Equal));
         assert_eq!(lexer.next(), Some(TokenType::Alphanumeric("value1")));
         assert_eq!(lexer.next(), Some(TokenType::LeaveSquareBracket));
+        assert_eq!(lexer.next(), None);
+    }
+    #[test]
+    fn token_curly_brackets() {
+        let mut lexer = Lexer::from("{}");
+        assert_eq!(lexer.next(), Some(TokenType::EnterCurlyBracket));
+        assert_eq!(lexer.next(), Some(TokenType::LeaveCurlyBracket));
+        assert_eq!(lexer.next(), None);
+    }
+    #[test]
+    fn node_index_selection() {
+        let mut lexer = Lexer::from("name{1}");
+        assert_eq!(lexer.next(), Some(TokenType::Alphanumeric("name")));
+        assert_eq!(lexer.next(), Some(TokenType::EnterCurlyBracket));
+        assert_eq!(lexer.next(), Some(TokenType::Alphanumeric("1")));
+        assert_eq!(lexer.next(), Some(TokenType::LeaveCurlyBracket));
         assert_eq!(lexer.next(), None);
     }
 }
