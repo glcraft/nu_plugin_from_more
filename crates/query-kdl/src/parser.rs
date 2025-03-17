@@ -347,6 +347,8 @@ mod tests {
         assert_eq!(parse("-1c0"), Err(MalformedNumber("-1c0")));
         assert_eq!(parse("abc"), Ok(Named("abc")));
         assert_eq!(parse("-abc"), Ok(Named("-abc")));
+        assert_eq!(parse("a1c"), Ok(Named("a1c")));
+        assert_eq!(parse("-a1c"), Ok(Named("-a1c")));
     }
     // #[test]
 }
