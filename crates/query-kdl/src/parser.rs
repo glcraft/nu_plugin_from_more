@@ -101,6 +101,8 @@ pub enum ParseQueryError<'a> {
     MissingPropertyName,
     #[error("markers like root or anywhere can't have entries")]
     EntriesOnMarker,
+    #[error("expected a node, but got something else")]
+    NotANode,
 }
 
 type Result<'a, T> = std::result::Result<T, ParseQueryError<'a>>;
@@ -132,7 +134,13 @@ impl<'a> Path<'a> {
                 TokenType::Star => Selector::Any,
                 TokenType::DoublePoint => Selector::Parent,
                 TokenType::String(s) => Selector::Named(Self::parse_string(s)?),
-                TokenType::Alphanumeric(s) => todo!(),
+                TokenType::Alphanumeric(s) => {
+                    let selector = Self::parse_alphanumeric(s)?;
+                    if !matches!(selector, Selector::Named(_)) {
+                        return Err(ParseQueryError::NotANode);
+                    }
+                    selector
+                }
                 TokenType::EnterSquareBracket => {
                     Selector::Entries(Entries::parse_lexer(&mut lexer)?)
                 }
