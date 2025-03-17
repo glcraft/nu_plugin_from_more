@@ -1,4 +1,4 @@
-use std::collections::HashMap;
+use std::{collections::HashMap, fmt::Display};
 
 use crate::lexer::{Lexer, TokenType};
 
@@ -23,13 +23,39 @@ pub enum Selector<'a> {
     /// Floating point
     FloatingPoing(f64),
 }
+impl<'a> Display for Selector<'a> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::Named(s) => write!(f, "{}", s),
+            Self::Any => write!(f, "*"),
+            Self::Root => write!(f, "/"),
+            Self::Anywhere => write!(f, "//"),
+            Self::Parent => write!(f, ".."),
+            Self::Entries(e) => write!(f, "{}", e),
+            Self::Ranged(beg, None) => write!(f, "{{{0}}}", beg),
+            Self::Ranged(beg, Some(end)) => write!(f, "{{{0}..{1}}}", beg, end),
+            Self::Integer(i) => write!(f, "{}", i),
+            Self::FloatingPoing(fp) => write!(f, "{}", fp),
+            _ => todo!(),
+        }
+    }
+}
 
 type Selectors<'a> = Vec<Selector<'a>>;
 
-#[derive(Clone, PartialEq, Eq, Debug)]
-struct Entries<'a> {
-    arguments: Vec<&'a str>,
-    properties: HashMap<&'a str, &'a str>,
+#[derive(Clone, PartialEq, Debug)]
+pub enum EntryKind<'a> {
+    Argument { position: u64, value: Selector<'a> },
+    Property { name: &'a str, value: Selector<'a> },
+}
+
+#[derive(Clone, PartialEq, Debug)]
+pub struct Entries<'a>(Vec<EntryKind<'a>>);
+
+impl<'a> Display for Entries<'a> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        todo!()
+    }
 }
 
 impl<'a> Entries<'a> {
@@ -37,48 +63,74 @@ impl<'a> Entries<'a> {
         Default::default()
     }
     fn parse_lexer(lexer: &mut impl Iterator<Item = TokenType<'a>>) -> Result<'a, Self> {
-        let mut args = vec![];
-        let mut props = HashMap::new();
+        let mut entries = vec![];
+        let mut arg_pos = 0;
         let mut prop_name = None;
+        let mut is_unamed_arg = false;
         while let Some(token) = lexer.next() {
-            let val = match token {
+            let value = match token {
                 TokenType::LeaveSquareBracket => break,
-                TokenType::Alphanumeric(s) => s,
-                TokenType::String(s) => Path::parse_string(s)?,
-                TokenType::Equal => {
+                TokenType::Alphanumeric(s) => {
+                    is_unamed_arg = true;
+                    Path::parse_alphanumeric(s)?
+                }
+                TokenType::String(s) => {
+                    is_unamed_arg = true;
+                    Selector::Named(Path::parse_string(s)?)
+                }
+                t @ TokenType::Equal => {
                     if prop_name.is_some() {
                         return Err(ParseQueryError::DoubleEqual);
                     }
-                    let Some(s) = args.pop() else {
-                        return Err(ParseQueryError::MissingPropertyName);
+                    let Some(EntryKind::Argument { position: _, value }) = entries.pop() else {
+                        return Err(ParseQueryError::MissingEntryIdentifier);
                     };
-                    prop_name = Some(s);
+                    if !is_unamed_arg {
+                        return Err(ParseQueryError::MissingEntryIdentifier);
+                    }
+                    prop_name = Some(value);
+                    arg_pos -= 1;
+                    is_unamed_arg = false;
                     continue;
                 }
                 t => return Err(ParseQueryError::UnexpectedToken(t)),
             };
             match prop_name {
-                Some(name) => {
-                    props.insert(name, val);
+                Some(Selector::Named(name)) => {
+                    entries.push(EntryKind::Property { name, value });
                     prop_name = None;
+                    is_unamed_arg = false;
                 }
+                Some(Selector::Integer(position)) => {
+                    entries.push(EntryKind::Argument {
+                        position: position as _,
+                        value,
+                    });
+                    prop_name = None;
+                    is_unamed_arg = false;
+                }
+                Some(s @ Selector::FloatingPoing(_)) => {
+                    return Err(ParseQueryError::UnexpectedEntryIdentifier(s))
+                }
+                Some(_) => unreachable!(),
                 None => {
-                    args.push(val);
+                    entries.push(EntryKind::Argument {
+                        position: arg_pos,
+                        value,
+                    });
+                    arg_pos += 1;
                 }
             }
         }
-        Ok(Entries {
-            arguments: args,
-            properties: props,
-        })
+        if prop_name.is_some() {
+            return Err(ParseQueryError::MissingEntryValue);
+        }
+        Ok(Entries(entries))
     }
 }
 impl<'a> Default for Entries<'a> {
     fn default() -> Self {
-        Self {
-            arguments: Vec::new(),
-            properties: HashMap::new(),
-        }
+        Self(Vec::new())
     }
 }
 
@@ -97,8 +149,12 @@ pub enum ParseQueryError<'a> {
     MalformedNumber(&'a str),
     #[error("double equal in entries")]
     DoubleEqual,
-    #[error("missing property name")]
-    MissingPropertyName,
+    #[error("missing entry value after an equal")]
+    MissingEntryValue,
+    #[error("entry must be identified by string (property name) or integer number (argument index), got {0}")]
+    UnexpectedEntryIdentifier(Selector<'a>),
+    #[error("missing entry identifier")]
+    MissingEntryIdentifier,
     #[error("markers like root or anywhere can't have entries")]
     EntriesOnMarker,
     #[error("expected a node, but got something else")]
@@ -214,7 +270,7 @@ impl<'a> Path<'a> {
 mod tests {
     use crate::{
         lexer::{Lexer, TokenType},
-        parser::{Entries, ParseQueryError, Path, Selector},
+        parser::{Entries, EntryKind, ParseQueryError, Path, Selector},
         util::hashmap,
     };
 
@@ -233,23 +289,201 @@ mod tests {
             Err(ParseQueryError::MalformedString("\"hello world")),
         );
     }
+    // #[test]
+    // fn parser_entries() {
+    //     let mut lexer = Lexer::from(r#"[1 2 3 a=4 b = 5 "p r o p"="v a l u e" 6]"#);
+    //     assert_eq!(lexer.next(), Some(TokenType::EnterSquareBracket));
+    //     assert_eq!(
+    //         Entries::parse_lexer(&mut lexer),
+    //         Ok(Entries {
+    //             arguments: vec!["1", "2", "3", "6"],
+    //             properties: hashmap! {
+    //                 "a" => "4",
+    //                 "b" => "5",
+    //                 "p r o p" => "v a l u e"
+    //             }
+    //         })
+    //     );
+    // }
     #[test]
-    fn parser_entries() {
-        let mut lexer = Lexer::from(r#"[1 2 3 a=4 b = 5 "p r o p"="v a l u e" 6]"#);
-        assert_eq!(lexer.next(), Some(TokenType::EnterSquareBracket));
+    fn entries() {
         assert_eq!(
-            Entries::parse_lexer(&mut lexer),
-            Ok(Entries {
-                arguments: vec!["1", "2", "3", "6"],
-                properties: hashmap! {
-                    "a" => "4",
-                    "b" => "5",
-                    "p r o p" => "v a l u e"
-                }
-            })
+            Entries::parse_lexer(&mut Lexer::from(
+                r#"1 2 3"# //
+            )),
+            Ok(Entries(vec![
+                EntryKind::Argument {
+                    position: 0,
+                    value: Selector::Integer(1)
+                },
+                EntryKind::Argument {
+                    position: 1,
+                    value: Selector::Integer(2)
+                },
+                EntryKind::Argument {
+                    position: 2,
+                    value: Selector::Integer(3)
+                },
+            ]))
+        );
+        assert_eq!(
+            Entries::parse_lexer(&mut Lexer::from(
+                r#"1 abc 3.14"# //
+            )),
+            Ok(Entries(vec![
+                EntryKind::Argument {
+                    position: 0,
+                    value: Selector::Integer(1)
+                },
+                EntryKind::Argument {
+                    position: 1,
+                    value: Selector::Named("abc")
+                },
+                EntryKind::Argument {
+                    position: 2,
+                    value: Selector::FloatingPoing(3.14)
+                },
+            ]))
+        );
+        assert_eq!(
+            Entries::parse_lexer(&mut Lexer::from(
+                r#"a=b c=d"# //
+            )),
+            Ok(Entries(vec![
+                EntryKind::Property {
+                    name: "a",
+                    value: Selector::Named("b")
+                },
+                EntryKind::Property {
+                    name: "c",
+                    value: Selector::Named("d")
+                },
+            ]))
+        );
+        assert_eq!(
+            Entries::parse_lexer(&mut Lexer::from(
+                r#"name1=123 name2=abc name3=3.14"# //
+            )),
+            Ok(Entries(vec![
+                EntryKind::Property {
+                    name: "name1",
+                    value: Selector::Integer(123)
+                },
+                EntryKind::Property {
+                    name: "name2",
+                    value: Selector::Named("abc")
+                },
+                EntryKind::Property {
+                    name: "name3",
+                    value: Selector::FloatingPoing(3.14)
+                },
+            ]))
+        );
+        assert_eq!(
+            Entries::parse_lexer(&mut Lexer::from(
+                r#"1=123 2=abc 3=3.14"# //
+            )),
+            Ok(Entries(vec![
+                EntryKind::Argument {
+                    position: 1,
+                    value: Selector::Integer(123)
+                },
+                EntryKind::Argument {
+                    position: 2,
+                    value: Selector::Named("abc")
+                },
+                EntryKind::Argument {
+                    position: 3,
+                    value: Selector::FloatingPoing(3.14)
+                },
+            ]))
+        );
+        assert_eq!(
+            Entries::parse_lexer(&mut Lexer::from(
+                r#"1 2 3 a=4 b = 5 "p r o p"="v a l u e" 6 10=7"# //
+            )),
+            Ok(Entries(vec![
+                EntryKind::Argument {
+                    position: 0,
+                    value: Selector::Integer(1)
+                },
+                EntryKind::Argument {
+                    position: 1,
+                    value: Selector::Integer(2)
+                },
+                EntryKind::Argument {
+                    position: 2,
+                    value: Selector::Integer(3)
+                },
+                EntryKind::Property {
+                    name: "a",
+                    value: Selector::Integer(4)
+                },
+                EntryKind::Property {
+                    name: "b",
+                    value: Selector::Integer(5)
+                },
+                EntryKind::Property {
+                    name: "p r o p",
+                    value: Selector::Named("v a l u e")
+                },
+                EntryKind::Argument {
+                    position: 3,
+                    value: Selector::Integer(6)
+                },
+                EntryKind::Argument {
+                    position: 10,
+                    value: Selector::Integer(7)
+                },
+            ]))
+        );
+        assert_eq!(
+            Entries::parse_lexer(&mut Lexer::from(
+                r#"1="# //
+            )),
+            Err(ParseQueryError::MissingEntryValue)
+        );
+        assert_eq!(
+            Entries::parse_lexer(&mut Lexer::from(
+                r#"name="# //
+            )),
+            Err(ParseQueryError::MissingEntryValue)
+        );
+        assert_eq!(
+            Entries::parse_lexer(&mut Lexer::from(
+                r#"3.1=abc"# //
+            )),
+            Err(ParseQueryError::UnexpectedEntryIdentifier(
+                Selector::FloatingPoing(3.1)
+            ))
+        );
+        assert_eq!(
+            Entries::parse_lexer(&mut Lexer::from(
+                r#"=abc"# //
+            )),
+            Err(ParseQueryError::MissingEntryIdentifier)
+        );
+        assert_eq!(
+            Entries::parse_lexer(&mut Lexer::from(
+                r#"1=abc =cba"# //
+            )),
+            Err(ParseQueryError::MissingEntryIdentifier)
+        );
+        assert_eq!(
+            Entries::parse_lexer(&mut Lexer::from(
+                r#"name=abc =cba"# //
+            )),
+            Err(ParseQueryError::MissingEntryIdentifier)
+        );
+        assert_eq!(
+            Entries::parse_lexer(&mut Lexer::from(
+                r#"name=abc [ ]"# //
+            )),
+            Err(ParseQueryError::UnexpectedToken(
+                TokenType::EnterSquareBracket
+            ))
         );
     }
-
     #[test]
     fn path_named_one() {
         assert_eq!(
