@@ -69,7 +69,17 @@ pub struct Entries<'a>(Vec<EntryKind<'a>>);
 
 impl<'a> Display for Entries<'a> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        todo!()
+        write!(f, "[ ")?;
+        for (i, v) in self.0.iter().enumerate() {
+            match v {
+                EntryKind::Argument { position, value } if i != (*position as _) => {
+                    write!(f, "{}={} ", position, value)
+                }
+                EntryKind::Argument { value, .. } => write!(f, "{} ", value),
+                EntryKind::Property { name, value } => write!(f, "{}={} ", name, value), // TODO: quote string if not alphanumeric
+            }?;
+        }
+        write!(f, "]")
     }
 }
 
