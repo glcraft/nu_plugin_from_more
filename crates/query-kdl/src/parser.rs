@@ -18,11 +18,8 @@ pub enum Selector<'a> {
     Entries(Entries<'a>),
     /// ranged or indexed selection
     Ranged(i32, Option<i32>),
-    /// Integer
-    Integer(i64),
-    /// Floating point
-    FloatingPoing(f64),
 }
+
 impl<'a> Display for Selector<'a> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
@@ -34,9 +31,27 @@ impl<'a> Display for Selector<'a> {
             Self::Entries(e) => write!(f, "{}", e),
             Self::Ranged(beg, None) => write!(f, "{{{0}}}", beg),
             Self::Ranged(beg, Some(end)) => write!(f, "{{{0}..{1}}}", beg, end),
+            _ => todo!(),
+        }
+    }
+}
+
+#[derive(Clone, PartialEq, Debug)]
+pub enum Value<'a> {
+    /// String
+    Str(&'a str),
+    /// Integer
+    Integer(i64),
+    /// Floating point
+    FloatingPoing(f64),
+}
+
+impl<'a> Display for Value<'a> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::Str(s) => write!(f, "{}", s),
             Self::Integer(i) => write!(f, "{}", i),
             Self::FloatingPoing(fp) => write!(f, "{}", fp),
-            _ => todo!(),
         }
     }
 }
@@ -45,8 +60,8 @@ type Selectors<'a> = Vec<Selector<'a>>;
 
 #[derive(Clone, PartialEq, Debug)]
 pub enum EntryKind<'a> {
-    Argument { position: u64, value: Selector<'a> },
-    Property { name: &'a str, value: Selector<'a> },
+    Argument { position: u64, value: Value<'a> },
+    Property { name: &'a str, value: Value<'a> },
 }
 
 #[derive(Clone, PartialEq, Debug)]
@@ -66,53 +81,52 @@ impl<'a> Entries<'a> {
         let mut entries = vec![];
         let mut arg_pos = 0;
         let mut prop_name = None;
-        let mut is_unamed_arg = false;
+        let mut is_unnamed_arg = false;
         while let Some(token) = lexer.next() {
             let value = match token {
                 TokenType::LeaveSquareBracket => break,
                 TokenType::Alphanumeric(s) => {
-                    is_unamed_arg = true;
+                    is_unnamed_arg = true;
                     Path::parse_alphanumeric(s)?
                 }
                 TokenType::String(s) => {
-                    is_unamed_arg = true;
-                    Selector::Named(Path::parse_string(s)?)
+                    is_unnamed_arg = true;
+                    Value::Str(Path::parse_string(s)?)
                 }
-                t @ TokenType::Equal => {
+                TokenType::Equal => {
                     if prop_name.is_some() {
                         return Err(ParseQueryError::DoubleEqual);
                     }
                     let Some(EntryKind::Argument { position: _, value }) = entries.pop() else {
                         return Err(ParseQueryError::MissingEntryIdentifier);
                     };
-                    if !is_unamed_arg {
+                    if !is_unnamed_arg {
                         return Err(ParseQueryError::MissingEntryIdentifier);
                     }
                     prop_name = Some(value);
                     arg_pos -= 1;
-                    is_unamed_arg = false;
+                    is_unnamed_arg = false;
                     continue;
                 }
                 t => return Err(ParseQueryError::UnexpectedToken(t)),
             };
             match prop_name {
-                Some(Selector::Named(name)) => {
+                Some(Value::Str(name)) => {
                     entries.push(EntryKind::Property { name, value });
                     prop_name = None;
-                    is_unamed_arg = false;
+                    is_unnamed_arg = false;
                 }
-                Some(Selector::Integer(position)) => {
+                Some(Value::Integer(position)) => {
                     entries.push(EntryKind::Argument {
                         position: position as _,
                         value,
                     });
                     prop_name = None;
-                    is_unamed_arg = false;
+                    is_unnamed_arg = false;
                 }
-                Some(s @ Selector::FloatingPoing(_)) => {
+                Some(s @ Value::FloatingPoing(_)) => {
                     return Err(ParseQueryError::UnexpectedEntryIdentifier(s))
                 }
-                Some(_) => unreachable!(),
                 None => {
                     entries.push(EntryKind::Argument {
                         position: arg_pos,
@@ -152,7 +166,7 @@ pub enum ParseQueryError<'a> {
     #[error("missing entry value after an equal")]
     MissingEntryValue,
     #[error("entry must be identified by string (property name) or integer number (argument index), got {0}")]
-    UnexpectedEntryIdentifier(Selector<'a>),
+    UnexpectedEntryIdentifier(Value<'a>),
     #[error("missing entry identifier")]
     MissingEntryIdentifier,
     #[error("markers like root or anywhere can't have entries")]
@@ -191,11 +205,11 @@ impl<'a> Path<'a> {
                 TokenType::DoublePoint => Selector::Parent,
                 TokenType::String(s) => Selector::Named(Self::parse_string(s)?),
                 TokenType::Alphanumeric(s) => {
-                    let selector = Self::parse_alphanumeric(s)?;
-                    if !matches!(selector, Selector::Named(_)) {
+                    let value = Self::parse_alphanumeric(s)?;
+                    let Value::Str(name) = value else {
                         return Err(ParseQueryError::NotANode);
-                    }
-                    selector
+                    };
+                    Selector::Named(name)
                 }
                 TokenType::EnterSquareBracket => {
                     Selector::Entries(Entries::parse_lexer(&mut lexer)?)
@@ -223,7 +237,7 @@ impl<'a> Path<'a> {
         // TODO: Convert escaped characters, output a Cow string
         return Ok(&s[1..s.len() - 1]);
     }
-    fn parse_alphanumeric(input: &'a str) -> Result<'a, Selector<'a>> {
+    fn parse_alphanumeric(input: &'a str) -> Result<'a, Value<'a>> {
         enum Kind {
             Int(u32),
             Float,
@@ -254,13 +268,13 @@ impl<'a> Path<'a> {
         };
         let result = match kind {
             Int(radix) => i64::from_str_radix(&input2[(2 * ((radix != 10) as usize))..], radix)
-                .map(|v| Selector::Integer(v * sign))
+                .map(|v| Value::Integer(v * sign))
                 .map_err(|_| ParseQueryError::MalformedNumber(input))?,
             Float => input
                 .parse()
-                .map(Selector::FloatingPoing)
+                .map(Value::FloatingPoing)
                 .map_err(|_| ParseQueryError::MalformedNumber(input))?,
-            Str => Selector::Named(input),
+            Str => Value::Str(input),
         };
         Ok(result)
     }
@@ -270,7 +284,7 @@ impl<'a> Path<'a> {
 mod tests {
     use crate::{
         lexer::{Lexer, TokenType},
-        parser::{Entries, EntryKind, ParseQueryError, Path, Selector},
+        parser::{Entries, EntryKind, ParseQueryError, Path, Selector, Value},
         util::hashmap,
     };
 
@@ -289,196 +303,156 @@ mod tests {
             Err(ParseQueryError::MalformedString("\"hello world")),
         );
     }
-    // #[test]
-    // fn parser_entries() {
-    //     let mut lexer = Lexer::from(r#"[1 2 3 a=4 b = 5 "p r o p"="v a l u e" 6]"#);
-    //     assert_eq!(lexer.next(), Some(TokenType::EnterSquareBracket));
-    //     assert_eq!(
-    //         Entries::parse_lexer(&mut lexer),
-    //         Ok(Entries {
-    //             arguments: vec!["1", "2", "3", "6"],
-    //             properties: hashmap! {
-    //                 "a" => "4",
-    //                 "b" => "5",
-    //                 "p r o p" => "v a l u e"
-    //             }
-    //         })
-    //     );
-    // }
     #[test]
     fn entries() {
         assert_eq!(
-            Entries::parse_lexer(&mut Lexer::from(
-                r#"1 2 3"# //
-            )),
+            Entries::parse_lexer(&mut Lexer::from(r#"1 2 3"#)),
             Ok(Entries(vec![
                 EntryKind::Argument {
                     position: 0,
-                    value: Selector::Integer(1)
+                    value: Value::Integer(1)
                 },
                 EntryKind::Argument {
                     position: 1,
-                    value: Selector::Integer(2)
+                    value: Value::Integer(2)
                 },
                 EntryKind::Argument {
                     position: 2,
-                    value: Selector::Integer(3)
+                    value: Value::Integer(3)
                 },
             ]))
         );
         assert_eq!(
-            Entries::parse_lexer(&mut Lexer::from(
-                r#"1 abc 3.14"# //
-            )),
+            Entries::parse_lexer(&mut Lexer::from(r#"1 abc 3.14"#)),
             Ok(Entries(vec![
                 EntryKind::Argument {
                     position: 0,
-                    value: Selector::Integer(1)
+                    value: Value::Integer(1)
                 },
                 EntryKind::Argument {
                     position: 1,
-                    value: Selector::Named("abc")
+                    value: Value::Str("abc")
                 },
                 EntryKind::Argument {
                     position: 2,
-                    value: Selector::FloatingPoing(3.14)
+                    value: Value::FloatingPoing(3.14)
                 },
             ]))
         );
         assert_eq!(
-            Entries::parse_lexer(&mut Lexer::from(
-                r#"a=b c=d"# //
-            )),
+            Entries::parse_lexer(&mut Lexer::from(r#"a=b c=d"#)),
             Ok(Entries(vec![
                 EntryKind::Property {
                     name: "a",
-                    value: Selector::Named("b")
+                    value: Value::Str("b")
                 },
                 EntryKind::Property {
                     name: "c",
-                    value: Selector::Named("d")
+                    value: Value::Str("d")
                 },
             ]))
         );
         assert_eq!(
-            Entries::parse_lexer(&mut Lexer::from(
-                r#"name1=123 name2=abc name3=3.14"# //
-            )),
+            Entries::parse_lexer(&mut Lexer::from(r#"name1=123 name2=abc name3=3.14"#)),
             Ok(Entries(vec![
                 EntryKind::Property {
                     name: "name1",
-                    value: Selector::Integer(123)
+                    value: Value::Integer(123)
                 },
                 EntryKind::Property {
                     name: "name2",
-                    value: Selector::Named("abc")
+                    value: Value::Str("abc")
                 },
                 EntryKind::Property {
                     name: "name3",
-                    value: Selector::FloatingPoing(3.14)
+                    value: Value::FloatingPoing(3.14)
                 },
             ]))
         );
         assert_eq!(
-            Entries::parse_lexer(&mut Lexer::from(
-                r#"1=123 2=abc 3=3.14"# //
-            )),
+            Entries::parse_lexer(&mut Lexer::from(r#"1=123 2=abc 3=3.14"#)),
             Ok(Entries(vec![
                 EntryKind::Argument {
                     position: 1,
-                    value: Selector::Integer(123)
+                    value: Value::Integer(123)
                 },
                 EntryKind::Argument {
                     position: 2,
-                    value: Selector::Named("abc")
+                    value: Value::Str("abc")
                 },
                 EntryKind::Argument {
                     position: 3,
-                    value: Selector::FloatingPoing(3.14)
+                    value: Value::FloatingPoing(3.14)
                 },
             ]))
         );
         assert_eq!(
             Entries::parse_lexer(&mut Lexer::from(
-                r#"1 2 3 a=4 b = 5 "p r o p"="v a l u e" 6 10=7"# //
+                r#"1 2 3 a=4 b = 5 "p r o p"="v a l u e" 6 10=7"#
             )),
             Ok(Entries(vec![
                 EntryKind::Argument {
                     position: 0,
-                    value: Selector::Integer(1)
+                    value: Value::Integer(1)
                 },
                 EntryKind::Argument {
                     position: 1,
-                    value: Selector::Integer(2)
+                    value: Value::Integer(2)
                 },
                 EntryKind::Argument {
                     position: 2,
-                    value: Selector::Integer(3)
+                    value: Value::Integer(3)
                 },
                 EntryKind::Property {
                     name: "a",
-                    value: Selector::Integer(4)
+                    value: Value::Integer(4)
                 },
                 EntryKind::Property {
                     name: "b",
-                    value: Selector::Integer(5)
+                    value: Value::Integer(5)
                 },
                 EntryKind::Property {
                     name: "p r o p",
-                    value: Selector::Named("v a l u e")
+                    value: Value::Str("v a l u e")
                 },
                 EntryKind::Argument {
                     position: 3,
-                    value: Selector::Integer(6)
+                    value: Value::Integer(6)
                 },
                 EntryKind::Argument {
                     position: 10,
-                    value: Selector::Integer(7)
+                    value: Value::Integer(7)
                 },
             ]))
         );
         assert_eq!(
-            Entries::parse_lexer(&mut Lexer::from(
-                r#"1="# //
-            )),
+            Entries::parse_lexer(&mut Lexer::from(r#"1="#)),
             Err(ParseQueryError::MissingEntryValue)
         );
         assert_eq!(
-            Entries::parse_lexer(&mut Lexer::from(
-                r#"name="# //
-            )),
+            Entries::parse_lexer(&mut Lexer::from(r#"name="#)),
             Err(ParseQueryError::MissingEntryValue)
         );
         assert_eq!(
-            Entries::parse_lexer(&mut Lexer::from(
-                r#"3.1=abc"# //
-            )),
+            Entries::parse_lexer(&mut Lexer::from(r#"3.1=abc"#)),
             Err(ParseQueryError::UnexpectedEntryIdentifier(
-                Selector::FloatingPoing(3.1)
+                Value::FloatingPoing(3.1)
             ))
         );
         assert_eq!(
-            Entries::parse_lexer(&mut Lexer::from(
-                r#"=abc"# //
-            )),
+            Entries::parse_lexer(&mut Lexer::from(r#"=abc"#)),
             Err(ParseQueryError::MissingEntryIdentifier)
         );
         assert_eq!(
-            Entries::parse_lexer(&mut Lexer::from(
-                r#"1=abc =cba"# //
-            )),
+            Entries::parse_lexer(&mut Lexer::from(r#"1=abc =cba"#)),
             Err(ParseQueryError::MissingEntryIdentifier)
         );
         assert_eq!(
-            Entries::parse_lexer(&mut Lexer::from(
-                r#"name=abc =cba"# //
-            )),
+            Entries::parse_lexer(&mut Lexer::from(r#"name=abc =cba"#)),
             Err(ParseQueryError::MissingEntryIdentifier)
         );
         assert_eq!(
-            Entries::parse_lexer(&mut Lexer::from(
-                r#"name=abc [ ]"# //
-            )),
+            Entries::parse_lexer(&mut Lexer::from(r#"name=abc [ ]"#)),
             Err(ParseQueryError::UnexpectedToken(
                 TokenType::EnterSquareBracket
             ))
@@ -563,7 +537,7 @@ mod tests {
     }
     #[test]
     fn alphanum() {
-        use {ParseQueryError::*, Selector::*};
+        use {ParseQueryError::*, Value::*};
         let parse = Path::parse_alphanumeric;
         assert_eq!(parse("123"), Ok(Integer(123)));
         assert_eq!(parse("-123"), Ok(Integer(-123)));
@@ -579,10 +553,10 @@ mod tests {
         assert_eq!(parse("-1.2.3"), Err(MalformedNumber("-1.2.3")));
         assert_eq!(parse("1c0"), Err(MalformedNumber("1c0")));
         assert_eq!(parse("-1c0"), Err(MalformedNumber("-1c0")));
-        assert_eq!(parse("abc"), Ok(Named("abc")));
-        assert_eq!(parse("-abc"), Ok(Named("-abc")));
-        assert_eq!(parse("a1c"), Ok(Named("a1c")));
-        assert_eq!(parse("-a1c"), Ok(Named("-a1c")));
+        assert_eq!(parse("abc"), Ok(Str("abc")));
+        assert_eq!(parse("-abc"), Ok(Str("-abc")));
+        assert_eq!(parse("a1c"), Ok(Str("a1c")));
+        assert_eq!(parse("-a1c"), Ok(Str("-a1c")));
     }
     // #[test]
 }
