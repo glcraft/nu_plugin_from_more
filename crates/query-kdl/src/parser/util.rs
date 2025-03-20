@@ -1,19 +1,109 @@
+use std::borrow::Cow;
+
 use super::{ParseQueryError, Result, Value};
-pub fn parse_string<'b>(s: &'b str) -> Result<'b, &'b str> {
-    match s.chars().next() {
-        None => return Err(ParseQueryError::MalformedString(s)),
-        Some(c) if c != '"' => return Err(ParseQueryError::MalformedString(s)),
+pub fn parse_string<'b>(input: &'b str) -> Result<'b, Cow<'b, str>> {
+    match input.chars().next() {
+        None => return Err(ParseQueryError::MalformedString(input)),
+        Some(c) if c != '"' => return Err(ParseQueryError::MalformedString(input)),
         Some(_) => (),
     }
 
-    match s.chars().last() {
+    match input.chars().last() {
         None => unreachable!(),
-        Some(c) if c != '"' => return Err(ParseQueryError::MalformedString(s)),
+        Some(c) if c != '"' => return Err(ParseQueryError::MalformedString(input)),
         Some(_) => (),
     }
-    // TODO: Convert escaped characters, output a Cow string
-    return Ok(&s[1..s.len() - 1]);
+    if input.chars().any(|c| c == '\\') {
+        Ok(Cow::Owned(unescape_string(input)?))
+    } else {
+        Ok(Cow::Borrowed(&input[1..input.len() - 1]))
+    }
 }
+#[derive(Clone, Copy)]
+enum State {
+    None,
+    Escape,
+    Ascii(u8, u32),
+    EnterUnicode,
+    Unicode(u32, u32),
+}
+struct UnescapeString {
+    state: State,
+    output: String,
+}
+impl UnescapeString {
+    pub fn new(capacity: usize) -> Self {
+        Self {
+            state: State::None,
+            output: String::with_capacity(capacity),
+        }
+    }
+    pub fn push_char(&mut self, c: char) {
+        self.output.push(c);
+        self.change_state(State::None);
+    }
+    pub fn change_state(&mut self, state: State) {
+        self.state = state;
+    }
+}
+pub fn unescape_string<'a>(input: &'a str) -> Result<'a, String> {
+    let mut state = UnescapeString::new(input.len());
+    for c in input.chars() {
+        match state.state {
+            State::None => {
+                if c == '\\' {
+                    state.change_state(State::Escape);
+                }
+            }
+            State::Escape => {
+                match c {
+                    'n' => state.push_char('\n'),
+                    't' => state.push_char('\t'),
+                    'r' => state.push_char('\r'),
+                    // '0' => state.push_char('\0'),
+                    '\\' => state.push_char('\\'),
+                    'x' => state.change_state(State::Ascii(0, 0)),
+                    'u' => state.change_state(State::EnterUnicode),
+                    _ => todo!("error"),
+                }
+            }
+            State::Ascii(mut codepoint, mut len) => {
+                codepoint = (codepoint << 4)
+                    + c.to_digit(16).ok_or_else(|| todo!("error not hex digit"))? as u8;
+                len += 1;
+                if len == 2 {
+                    state.push_char(codepoint.into());
+                } else {
+                    state.change_state(State::Ascii(codepoint, len));
+                }
+            }
+            State::Unicode(mut codepoint, mut len) => {
+                if c == '}' {
+                    state.push_char(
+                        char::from_u32(codepoint)
+                            .ok_or_else(|| todo!("error not a valid codepoint"))?,
+                    );
+                } else {
+                    codepoint = (codepoint << 4)
+                        + c.to_digit(16).ok_or_else(|| todo!("error not hex digit"))?;
+                    len += 1;
+                    state.change_state(State::Unicode(codepoint, len));
+                    if len > 6 {
+                        todo!("error codepoint out of bound")
+                    }
+                }
+            }
+            State::EnterUnicode => {
+                if c != '{' {
+                    todo!("error {{ expected");
+                }
+                state.change_state(State::Unicode(0, 0));
+            }
+        }
+    }
+    Ok(state.output)
+}
+
 pub fn parse_alphanumeric<'a>(input: &'a str) -> Result<'a, Value<'a>> {
     enum Kind {
         Int(u32),
