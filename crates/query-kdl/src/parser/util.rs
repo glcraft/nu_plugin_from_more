@@ -1,7 +1,7 @@
 use super::Value;
 use std::borrow::Cow;
 
-enum ParseStringError {
+pub enum ParseStringError {
     EmptyString,
     MissingBeginOfString,
     MissingEndOfString,
@@ -11,8 +11,9 @@ enum ParseStringError {
     ExpectedCurlyBracket,
     MalformedNumber,
 }
+pub type Result<T> = std::result::Result<T, ParseStringError>;
 
-pub fn parse_string<'b>(input: &'b str) -> std::result::Result<Cow<'b, str>, ParseStringError> {
+pub fn parse_string<'b>(input: &'b str) -> Result<Cow<'b, str>> {
     match input.chars().next() {
         None => return Err(ParseStringError::EmptyString),
         Some(c) if c != '"' => return Err(ParseStringError::MissingBeginOfString),
@@ -58,7 +59,7 @@ impl UnescapeString {
         self.state = state;
     }
 }
-pub fn unescape_string<'a>(input: &'a str) -> std::result::Result<String, ParseStringError> {
+pub fn unescape_string<'a>(input: &'a str) -> Result<String> {
     let mut state = UnescapeString::new(input.len());
     for c in input.chars() {
         match state.state {
@@ -115,7 +116,7 @@ pub fn unescape_string<'a>(input: &'a str) -> std::result::Result<String, ParseS
     Ok(state.output)
 }
 
-pub fn parse_alphanumeric<'a>(input: &'a str) -> std::result::Result<Value<'a>, ParseStringError> {
+pub fn parse_alphanumeric<'a>(input: &'a str) -> Result<Value<'a>> {
     enum Kind {
         Int(u32),
         Float,
