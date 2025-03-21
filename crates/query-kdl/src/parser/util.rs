@@ -1,16 +1,27 @@
+use super::Value;
 use std::borrow::Cow;
 
-use super::{ParseQueryError, Result, Value};
-pub fn parse_string<'b>(input: &'b str) -> Result<'b, Cow<'b, str>> {
+enum ParseStringError {
+    EmptyString,
+    MissingBeginOfString,
+    MissingEndOfString,
+    NotHexDigit,
+    NotValidCodepoint,
+    OutOfBoundCodepoint,
+    ExpectedCurlyBracket,
+    MalformedNumber,
+}
+
+pub fn parse_string<'b>(input: &'b str) -> std::result::Result<Cow<'b, str>, ParseStringError> {
     match input.chars().next() {
-        None => return Err(ParseQueryError::MalformedString(input)),
-        Some(c) if c != '"' => return Err(ParseQueryError::MalformedString(input)),
+        None => return Err(ParseStringError::EmptyString),
+        Some(c) if c != '"' => return Err(ParseStringError::MissingBeginOfString),
         Some(_) => (),
     }
 
     match input.chars().last() {
         None => unreachable!(),
-        Some(c) if c != '"' => return Err(ParseQueryError::MalformedString(input)),
+        Some(c) if c != '"' => return Err(ParseStringError::MissingEndOfString),
         Some(_) => (),
     }
     if input.chars().any(|c| c == '\\') {
@@ -19,6 +30,7 @@ pub fn parse_string<'b>(input: &'b str) -> Result<'b, Cow<'b, str>> {
         Ok(Cow::Borrowed(&input[1..input.len() - 1]))
     }
 }
+
 #[derive(Clone, Copy)]
 enum State {
     None,
@@ -46,7 +58,7 @@ impl UnescapeString {
         self.state = state;
     }
 }
-pub fn unescape_string<'a>(input: &'a str) -> Result<'a, String> {
+pub fn unescape_string<'a>(input: &'a str) -> std::result::Result<String, ParseStringError> {
     let mut state = UnescapeString::new(input.len());
     for c in input.chars() {
         match state.state {
@@ -68,8 +80,8 @@ pub fn unescape_string<'a>(input: &'a str) -> Result<'a, String> {
                 }
             }
             State::Ascii(mut codepoint, mut len) => {
-                codepoint = (codepoint << 4)
-                    + c.to_digit(16).ok_or_else(|| todo!("error not hex digit"))? as u8;
+                codepoint =
+                    (codepoint << 4) + c.to_digit(16).ok_or(ParseStringError::NotHexDigit)? as u8;
                 len += 1;
                 if len == 2 {
                     state.push_char(codepoint.into());
@@ -80,22 +92,21 @@ pub fn unescape_string<'a>(input: &'a str) -> Result<'a, String> {
             State::Unicode(mut codepoint, mut len) => {
                 if c == '}' {
                     state.push_char(
-                        char::from_u32(codepoint)
-                            .ok_or_else(|| todo!("error not a valid codepoint"))?,
+                        char::from_u32(codepoint).ok_or(ParseStringError::NotValidCodepoint)?,
                     );
                 } else {
-                    codepoint = (codepoint << 4)
-                        + c.to_digit(16).ok_or_else(|| todo!("error not hex digit"))?;
+                    codepoint =
+                        (codepoint << 4) + c.to_digit(16).ok_or(ParseStringError::NotHexDigit)?;
                     len += 1;
                     state.change_state(State::Unicode(codepoint, len));
                     if len > 6 {
-                        todo!("error codepoint out of bound")
+                        return Err(ParseStringError::OutOfBoundCodepoint);
                     }
                 }
             }
             State::EnterUnicode => {
                 if c != '{' {
-                    todo!("error {{ expected");
+                    return Err(ParseStringError::ExpectedCurlyBracket);
                 }
                 state.change_state(State::Unicode(0, 0));
             }
@@ -104,7 +115,7 @@ pub fn unescape_string<'a>(input: &'a str) -> Result<'a, String> {
     Ok(state.output)
 }
 
-pub fn parse_alphanumeric<'a>(input: &'a str) -> Result<'a, Value<'a>> {
+pub fn parse_alphanumeric<'a>(input: &'a str) -> std::result::Result<Value<'a>, ParseStringError> {
     enum Kind {
         Int(u32),
         Float,
@@ -128,7 +139,7 @@ pub fn parse_alphanumeric<'a>(input: &'a str) -> Result<'a, Value<'a>> {
         match input2.chars().filter(|c| *c == '.').count() {
             0 => Int(10),
             1 => Float,
-            _ => return Err(ParseQueryError::MalformedNumber(input)),
+            _ => return Err(ParseStringError::MalformedNumber),
         }
     } else {
         Str
@@ -136,11 +147,11 @@ pub fn parse_alphanumeric<'a>(input: &'a str) -> Result<'a, Value<'a>> {
     let result = match kind {
         Int(radix) => i64::from_str_radix(&input2[(2 * ((radix != 10) as usize))..], radix)
             .map(|v| Value::Integer(v * sign))
-            .map_err(|_| ParseQueryError::MalformedNumber(input))?,
+            .map_err(|_| ParseStringError::MalformedNumber)?,
         Float => input
             .parse()
             .map(Value::FloatingPoing)
-            .map_err(|_| ParseQueryError::MalformedNumber(input))?,
+            .map_err(|_| ParseStringError::MalformedNumber)?,
         Str => Value::Str(input),
     };
     Ok(result)
