@@ -296,3 +296,14 @@ fn alphanum() {
     assert_eq!(PARSE("a1c"), Ok(Str(Cow::Borrowed("a1c"))));
     assert_eq!(PARSE("-a1c"), Ok(Str(Cow::Borrowed("-a1c"))));
 }
+#[test]
+fn strings() {
+    use {ParseStringError::*, Value::*};
+    const PARSE: fn(&str) -> Result<Cow<'_, str>, ParseStringError> = string::parse_string;
+    assert_eq!(PARSE(r#""""#), Ok(Cow::Borrowed("")));
+    assert_eq!(PARSE(r#""abc""#), Ok(Cow::Borrowed("abc")));
+    assert_eq!(
+        PARSE(r#""a\nb\nc""#),
+        Ok(Cow::Owned(String::from("a\nb\nc")))
+    );
+}
