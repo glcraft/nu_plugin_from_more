@@ -1,4 +1,4 @@
-use super::{util, ParseError, Result, Value};
+use super::{string, ParseError, Result, Value};
 use crate::lexer::TokenType;
 use std::fmt::Display;
 
@@ -46,11 +46,11 @@ impl<'a> Entries<'a> {
                 TokenType::LeaveSquareBracket => break,
                 TokenType::Alphanumeric(s) => {
                     is_unnamed_arg = true;
-                    util::parse_alphanumeric(s)?
+                    string::parse_alphanumeric(s)?
                 }
                 TokenType::String(s) => {
                     is_unnamed_arg = true;
-                    Value::Str(util::parse_string(s)?)
+                    Value::Str(string::parse_string(s)?)
                 }
                 TokenType::Equal => {
                     if prop_name.is_some() {

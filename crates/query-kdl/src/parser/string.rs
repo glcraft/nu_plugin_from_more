@@ -1,16 +1,6 @@
-use super::Value;
+use super::{error::ParseStringError, Value};
 use std::borrow::Cow;
 
-pub enum ParseStringError {
-    EmptyString,
-    MissingBeginOfString,
-    MissingEndOfString,
-    NotHexDigit,
-    NotValidCodepoint,
-    OutOfBoundCodepoint,
-    ExpectedCurlyBracket,
-    MalformedNumber,
-}
 pub type Result<T> = std::result::Result<T, ParseStringError>;
 
 pub fn parse_string<'b>(input: &'b str) -> Result<Cow<'b, str>> {

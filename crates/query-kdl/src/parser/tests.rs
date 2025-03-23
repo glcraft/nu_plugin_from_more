@@ -1,6 +1,6 @@
 use crate::{
     lexer::{Lexer, TokenType},
-    parser::{entries::EntryKind, util, Entries, ParseError, Path, Selector, Value},
+    parser::{entries::EntryKind, string, Entries, ParseError, Path, Selector, Value},
     util::hashmap,
 };
 
@@ -10,7 +10,7 @@ fn parser_strings() {
         let mut lexer = Lexer::from(input);
         let token = lexer.next();
         assert_eq!(token, Some(TokenType::String(input)));
-        assert_eq!(util::parse_string(input), output);
+        assert_eq!(string::parse_string(input), output);
     }
     test_string("\"hello\"", Ok("hello"));
     test_string("\"hello world\"", Ok("hello world"));
@@ -252,7 +252,7 @@ fn path_ident_parents() {
 #[test]
 fn alphanum() {
     use {ParseError::*, Value::*};
-    let parse = util::parse_alphanumeric;
+    let parse = string::parse_alphanumeric;
     assert_eq!(parse("123"), Ok(Integer(123)));
     assert_eq!(parse("-123"), Ok(Integer(-123)));
     assert_eq!(parse("0x123"), Ok(Integer(0x123)));

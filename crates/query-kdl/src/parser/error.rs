@@ -1,6 +1,17 @@
 use super::Value;
 use crate::lexer::TokenType;
 
+pub enum ParseStringError {
+    EmptyString,
+    MissingBeginOfString,
+    MissingEndOfString,
+    NotHexDigit,
+    NotValidCodepoint,
+    OutOfBoundCodepoint,
+    ExpectedCurlyBracket,
+    MalformedNumber,
+}
+
 #[derive(thiserror::Error, PartialEq, Debug)]
 pub enum ParseError<'a> {
     #[error("unexpected token: {0}")]

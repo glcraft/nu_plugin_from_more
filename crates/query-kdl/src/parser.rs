@@ -1,8 +1,8 @@
 mod entries;
 mod error;
+mod string;
 #[cfg(test)]
 mod tests;
-mod util;
 mod value;
 
 use crate::lexer::{Lexer, TokenType};
@@ -76,9 +76,9 @@ impl<'a> Path<'a> {
                 }
                 TokenType::Star => Selector::Any,
                 TokenType::DoublePoint => Selector::Parent,
-                TokenType::String(s) => Selector::Named(util::parse_string(s)?),
+                TokenType::String(s) => Selector::Named(string::parse_string(s)?),
                 TokenType::Alphanumeric(s) => {
-                    let value = util::parse_alphanumeric(s)?;
+                    let value = string::parse_alphanumeric(s)?;
                     let Value::Str(name) = value else {
                         return Err(ParseError::NotANode);
                     };
