@@ -1,22 +1,32 @@
+use std::borrow::Cow;
+
 use crate::{
     lexer::{Lexer, TokenType},
-    parser::{entries::EntryKind, string, Entries, ParseError, Path, Selector, Value},
+    parser::{
+        entries::EntryKind, error::ParseStringError, string, Entries, ParseError, Path, Selector,
+        Value,
+    },
     util::hashmap,
 };
-
 #[test]
 fn parser_strings() {
     fn test_string(input: &str, output: Result<&str, ParseError>) {
         let mut lexer = Lexer::from(input);
         let token = lexer.next();
         assert_eq!(token, Some(TokenType::String(input)));
-        assert_eq!(string::parse_string(input), output);
+        assert_eq!(
+            string::parse_string(input).map_err(|e| e.into_parse_error(input)),
+            output.map(Cow::Borrowed)
+        );
     }
     test_string("\"hello\"", Ok("hello"));
     test_string("\"hello world\"", Ok("hello world"));
     test_string(
         "\"hello world",
-        Err(ParseError::MalformedString("\"hello world")),
+        Err(ParseError::MalformedString(
+            "\"hello world",
+            ParseStringError::MissingEndOfString,
+        )),
     );
 }
 #[test]
@@ -47,7 +57,7 @@ fn entries() {
             },
             EntryKind::Argument {
                 position: 1,
-                value: Value::Str("abc")
+                value: Value::Str(Cow::Borrowed("abc"))
             },
             EntryKind::Argument {
                 position: 2,
@@ -59,12 +69,12 @@ fn entries() {
         Entries::parse_lexer(&mut Lexer::from(r#"a=b c=d"#)),
         Ok(Entries::from(vec![
             EntryKind::Property {
-                name: "a",
-                value: Value::Str("b")
+                name: Cow::Borrowed("a"),
+                value: Value::Str(Cow::Borrowed("b"))
             },
             EntryKind::Property {
-                name: "c",
-                value: Value::Str("d")
+                name: Cow::Borrowed("c"),
+                value: Value::Str(Cow::Borrowed("d"))
             },
         ]))
     );
@@ -72,15 +82,15 @@ fn entries() {
         Entries::parse_lexer(&mut Lexer::from(r#"name1=123 name2=abc name3=3.14"#)),
         Ok(Entries::from(vec![
             EntryKind::Property {
-                name: "name1",
+                name: Cow::Borrowed("name1"),
                 value: Value::Integer(123)
             },
             EntryKind::Property {
-                name: "name2",
-                value: Value::Str("abc")
+                name: Cow::Borrowed("name2"),
+                value: Value::Str(Cow::Borrowed("abc"))
             },
             EntryKind::Property {
-                name: "name3",
+                name: Cow::Borrowed("name3"),
                 value: Value::FloatingPoing(3.14)
             },
         ]))
@@ -94,7 +104,7 @@ fn entries() {
             },
             EntryKind::Argument {
                 position: 2,
-                value: Value::Str("abc")
+                value: Value::Str(Cow::Borrowed("abc"))
             },
             EntryKind::Argument {
                 position: 3,
@@ -120,16 +130,16 @@ fn entries() {
                 value: Value::Integer(3)
             },
             EntryKind::Property {
-                name: "a",
+                name: Cow::Borrowed("a"),
                 value: Value::Integer(4)
             },
             EntryKind::Property {
-                name: "b",
+                name: Cow::Borrowed("b"),
                 value: Value::Integer(5)
             },
             EntryKind::Property {
-                name: "p r o p",
-                value: Value::Str("v a l u e")
+                name: Cow::Borrowed("p r o p"),
+                value: Value::Str(Cow::Borrowed("v a l u e"))
             },
             EntryKind::Argument {
                 position: 3,
@@ -177,7 +187,7 @@ fn path_named_one() {
     assert_eq!(
         Path::parse("node_name"),
         Ok(Path {
-            nodes: vec![Selector::Named("node_name")]
+            nodes: vec![Selector::Named(Cow::Borrowed("node_name"))]
         })
     );
 }
@@ -187,7 +197,10 @@ fn path_named_multi() {
     assert_eq!(
         Path::parse("node1/node2"),
         Ok(Path {
-            nodes: vec![Selector::Named("node1"), Selector::Named("node2")]
+            nodes: vec![
+                Selector::Named(Cow::Borrowed("node1")),
+                Selector::Named(Cow::Borrowed("node2")),
+            ]
         })
     );
 }
@@ -197,7 +210,10 @@ fn path_named_strings() {
     assert_eq!(
         Path::parse(r#""node 1"/"node 2""#),
         Ok(Path {
-            nodes: vec![Selector::Named("node 1"), Selector::Named("node 2")]
+            nodes: vec![
+                Selector::Named(Cow::Borrowed("node 1")),
+                Selector::Named(Cow::Borrowed("node 2")),
+            ]
         })
     );
 }
@@ -206,7 +222,7 @@ fn path_ident_root() {
     assert_eq!(
         Path::parse(r#"/node1"#),
         Ok(Path {
-            nodes: vec![Selector::Root, Selector::Named("node1")]
+            nodes: vec![Selector::Root, Selector::Named(Cow::Borrowed("node1"))]
         })
     );
     assert_eq!(
@@ -214,8 +230,8 @@ fn path_ident_root() {
         Ok(Path {
             nodes: vec![
                 Selector::Root,
-                Selector::Named("node1"),
-                Selector::Named("node2")
+                Selector::Named(Cow::Borrowed("node1")),
+                Selector::Named(Cow::Borrowed("node2"))
             ]
         })
     );
@@ -226,7 +242,7 @@ fn path_ident_anywhere() {
     assert_eq!(
         Path::parse(r#"//node1"#),
         Ok(Path {
-            nodes: vec![Selector::Anywhere, Selector::Named("node1")]
+            nodes: vec![Selector::Anywhere, Selector::Named(Cow::Borrowed("node1"))]
         })
     );
 }
@@ -236,7 +252,11 @@ fn path_ident_any() {
     assert_eq!(
         Path::parse(r#"/*/node1"#),
         Ok(Path {
-            nodes: vec![Selector::Root, Selector::Any, Selector::Named("node1")]
+            nodes: vec![
+                Selector::Root,
+                Selector::Any,
+                Selector::Named(Cow::Borrowed("node1"))
+            ]
         })
     );
 }
@@ -245,30 +265,34 @@ fn path_ident_parents() {
     assert_eq!(
         Path::parse(r#"/../node1"#),
         Ok(Path {
-            nodes: vec![Selector::Root, Selector::Parent, Selector::Named("node1")]
+            nodes: vec![
+                Selector::Root,
+                Selector::Parent,
+                Selector::Named(Cow::Borrowed("node1"))
+            ]
         })
     );
 }
 #[test]
 fn alphanum() {
-    use {ParseError::*, Value::*};
-    let parse = string::parse_alphanumeric;
-    assert_eq!(parse("123"), Ok(Integer(123)));
-    assert_eq!(parse("-123"), Ok(Integer(-123)));
-    assert_eq!(parse("0x123"), Ok(Integer(0x123)));
-    assert_eq!(parse("0b101"), Ok(Integer(0b101)));
-    assert_eq!(parse("0o123"), Ok(Integer(0o123)));
-    assert_eq!(parse("-0x123"), Ok(Integer(-0x123)));
-    assert_eq!(parse("-0b101"), Ok(Integer(-0b101)));
-    assert_eq!(parse("-0o123"), Ok(Integer(-0o123)));
-    assert_eq!(parse("1.23"), Ok(FloatingPoing(1.23)));
-    assert_eq!(parse("-1.23"), Ok(FloatingPoing(-1.23)));
-    assert_eq!(parse("1.2.3"), Err(MalformedNumber("1.2.3")));
-    assert_eq!(parse("-1.2.3"), Err(MalformedNumber("-1.2.3")));
-    assert_eq!(parse("1c0"), Err(MalformedNumber("1c0")));
-    assert_eq!(parse("-1c0"), Err(MalformedNumber("-1c0")));
-    assert_eq!(parse("abc"), Ok(Str("abc")));
-    assert_eq!(parse("-abc"), Ok(Str("-abc")));
-    assert_eq!(parse("a1c"), Ok(Str("a1c")));
-    assert_eq!(parse("-a1c"), Ok(Str("-a1c")));
+    use {ParseStringError::*, Value::*};
+    const PARSE: fn(&str) -> Result<Value<'_>, ParseStringError> = string::parse_alphanumeric;
+    assert_eq!(PARSE("123"), Ok(Integer(123)));
+    assert_eq!(PARSE("-123"), Ok(Integer(-123)));
+    assert_eq!(PARSE("0x123"), Ok(Integer(0x123)));
+    assert_eq!(PARSE("0b101"), Ok(Integer(0b101)));
+    assert_eq!(PARSE("0o123"), Ok(Integer(0o123)));
+    assert_eq!(PARSE("-0x123"), Ok(Integer(-0x123)));
+    assert_eq!(PARSE("-0b101"), Ok(Integer(-0b101)));
+    assert_eq!(PARSE("-0o123"), Ok(Integer(-0o123)));
+    assert_eq!(PARSE("1.23"), Ok(FloatingPoing(1.23)));
+    assert_eq!(PARSE("-1.23"), Ok(FloatingPoing(-1.23)));
+    assert_eq!(PARSE("1.2.3"), Err(MalformedNumber));
+    assert_eq!(PARSE("-1.2.3"), Err(MalformedNumber));
+    assert_eq!(PARSE("1c0"), Err(MalformedNumber));
+    assert_eq!(PARSE("-1c0"), Err(MalformedNumber));
+    assert_eq!(PARSE("abc"), Ok(Str(Cow::Borrowed("abc"))));
+    assert_eq!(PARSE("-abc"), Ok(Str(Cow::Borrowed("-abc"))));
+    assert_eq!(PARSE("a1c"), Ok(Str(Cow::Borrowed("a1c"))));
+    assert_eq!(PARSE("-a1c"), Ok(Str(Cow::Borrowed("-a1c"))));
 }
