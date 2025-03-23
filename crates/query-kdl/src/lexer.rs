@@ -91,12 +91,25 @@ impl<'a> Lexer<'a> {
         self.advance_and_return(len_str).map(TokenType::String)
     }
     fn get_alphanumeric(&mut self) -> Option<<Self as Iterator>::Item> {
-        let len = self
+        let it = self
             .input
             .chars()
             .take_while(|c| c.is_alphanumeric() || *c == '_' || *c == '.')
-            .map(char::len_utf8)
-            .sum();
+            .map(|c| (c.len_utf8(), c));
+        let mut n_points = 0;
+        let mut len = 0;
+        for (clen, c) in it {
+            len += clen;
+            if c != '.' {
+                n_points = 0;
+                continue;
+            }
+            n_points += 1;
+            if n_points == 2 {
+                len -= 2;
+                break;
+            }
+        }
         self.advance_and_return(len).map(TokenType::Alphanumeric)
     }
     fn get_token(&mut self) -> Option<<Self as Iterator>::Item> {
@@ -268,12 +281,15 @@ mod tests {
         assert_eq!(lexer.next(), None);
     }
     #[test]
-    fn node_index_selection() {
-        let mut lexer = Lexer::from("name{1}");
+    fn numbers() {
+        let mut lexer = Lexer::from("name 1 1.2 1.2.3 1..2");
         assert_eq!(lexer.next(), Some(TokenType::Alphanumeric("name")));
-        assert_eq!(lexer.next(), Some(TokenType::EnterCurlyBracket));
         assert_eq!(lexer.next(), Some(TokenType::Alphanumeric("1")));
-        assert_eq!(lexer.next(), Some(TokenType::LeaveCurlyBracket));
+        assert_eq!(lexer.next(), Some(TokenType::Alphanumeric("1.2")));
+        assert_eq!(lexer.next(), Some(TokenType::Alphanumeric("1.2.3")));
+        assert_eq!(lexer.next(), Some(TokenType::Alphanumeric("1")));
+        assert_eq!(lexer.next(), Some(TokenType::DoublePoint));
+        assert_eq!(lexer.next(), Some(TokenType::Alphanumeric("2")));
         assert_eq!(lexer.next(), None);
     }
 }
