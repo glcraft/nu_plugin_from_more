@@ -1,6 +1,7 @@
 use super::Value;
 use crate::lexer::TokenType;
 
+#[derive(Clone, Debug, PartialEq)]
 pub enum ParseStringError {
     EmptyString,
     MissingBeginOfString,
@@ -12,12 +13,19 @@ pub enum ParseStringError {
     MalformedNumber,
 }
 
+impl ParseStringError {
+    #[inline]
+    pub fn into_parse_error<'a>(self, origin: &'a str) -> ParseError<'a> {
+        ParseError::MalformedString(origin, self)
+    }
+}
+
 #[derive(thiserror::Error, PartialEq, Debug)]
 pub enum ParseError<'a> {
     #[error("unexpected token: {0}")]
     UnexpectedToken(TokenType<'a>),
     #[error("malformed string (missing \"): {0}")]
-    MalformedString(&'a str),
+    MalformedString(&'a str, ParseStringError),
     #[error("malformed number: {0}")]
     MalformedNumber(&'a str),
     #[error("double equal in entries")]

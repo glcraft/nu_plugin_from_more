@@ -1,11 +1,17 @@
 use super::{string, ParseError, Result, Value};
 use crate::lexer::TokenType;
-use std::fmt::Display;
+use std::{borrow::Cow, fmt::Display};
 
 #[derive(Clone, PartialEq, Debug)]
 pub enum EntryKind<'a> {
-    Argument { position: u64, value: Value<'a> },
-    Property { name: &'a str, value: Value<'a> },
+    Argument {
+        position: u64,
+        value: Value<'a>,
+    },
+    Property {
+        name: Cow<'a, str>,
+        value: Value<'a>,
+    },
 }
 
 #[derive(Clone, PartialEq, Debug)]
@@ -46,11 +52,11 @@ impl<'a> Entries<'a> {
                 TokenType::LeaveSquareBracket => break,
                 TokenType::Alphanumeric(s) => {
                     is_unnamed_arg = true;
-                    string::parse_alphanumeric(s)?
+                    string::parse_alphanumeric(s).map_err(|e| e.into_parse_error(s))?
                 }
                 TokenType::String(s) => {
                     is_unnamed_arg = true;
-                    Value::Str(string::parse_string(s)?)
+                    Value::Str(string::parse_string(s).map_err(|e| e.into_parse_error(s))?)
                 }
                 TokenType::Equal => {
                     if prop_name.is_some() {

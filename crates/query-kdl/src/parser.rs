@@ -8,13 +8,13 @@ mod value;
 use crate::lexer::{Lexer, TokenType};
 use entries::Entries;
 pub use error::{ParseError, Result};
-use std::{collections::HashMap, fmt::Display};
+use std::{borrow::Cow, collections::HashMap, fmt::Display};
 use value::Value;
 
 #[derive(Clone, PartialEq, Debug)]
 pub enum Selector<'a> {
     /// "<name>" Node with a name
-    Named(&'a str),
+    Named(Cow<'a, str>),
     /// "*" Any nodes in the current scope
     Any,
     /// "/" Root node
@@ -76,9 +76,11 @@ impl<'a> Path<'a> {
                 }
                 TokenType::Star => Selector::Any,
                 TokenType::DoublePoint => Selector::Parent,
-                TokenType::String(s) => Selector::Named(string::parse_string(s)?),
+                TokenType::String(s) => {
+                    Selector::Named(string::parse_string(s).map_err(|e| e.into_parse_error(s))?)
+                }
                 TokenType::Alphanumeric(s) => {
-                    let value = string::parse_alphanumeric(s)?;
+                    let value = string::parse_alphanumeric(s).map_err(|e| e.into_parse_error(s))?;
                     let Value::Str(name) = value else {
                         return Err(ParseError::NotANode);
                     };

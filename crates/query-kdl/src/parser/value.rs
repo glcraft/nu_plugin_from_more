@@ -1,9 +1,9 @@
-use std::fmt::Display;
+use std::{borrow::Cow, fmt::Display};
 
 #[derive(Clone, PartialEq, Debug)]
 pub enum Value<'a> {
     /// String
-    Str(&'a str),
+    Str(Cow<'a, str>),
     /// Integer
     Integer(i64),
     /// Floating point
