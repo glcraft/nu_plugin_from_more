@@ -16,7 +16,7 @@ pub fn parse_string<'b>(input: &'b str) -> Result<Cow<'b, str>> {
         Some(_) => (),
     }
     if input.chars().any(|c| c == '\\') {
-        Ok(Cow::Owned(unescape_string(input)?))
+        Ok(Cow::Owned(unescape_string(&input[1..input.len() - 1])?))
     } else {
         Ok(Cow::Borrowed(&input[1..input.len() - 1]))
     }
@@ -56,6 +56,8 @@ pub fn unescape_string<'a>(input: &'a str) -> Result<String> {
             State::None => {
                 if c == '\\' {
                     state.change_state(State::Escape);
+                } else {
+                    state.push_char(c);
                 }
             }
             State::Escape => {
