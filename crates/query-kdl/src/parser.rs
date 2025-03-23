@@ -7,7 +7,7 @@ mod value;
 
 use crate::lexer::{Lexer, TokenType};
 use entries::Entries;
-pub use error::{ParseQueryError, Result};
+pub use error::{ParseError, Result};
 use std::{collections::HashMap, fmt::Display};
 use value::Value;
 
@@ -71,7 +71,7 @@ impl<'a> Path<'a> {
                     if nodes.is_empty() {
                         Selector::Anywhere
                     } else {
-                        return Err(ParseQueryError::UnexpectedToken(token));
+                        return Err(ParseError::UnexpectedToken(token));
                     }
                 }
                 TokenType::Star => Selector::Any,
@@ -80,7 +80,7 @@ impl<'a> Path<'a> {
                 TokenType::Alphanumeric(s) => {
                     let value = util::parse_alphanumeric(s)?;
                     let Value::Str(name) = value else {
-                        return Err(ParseQueryError::NotANode);
+                        return Err(ParseError::NotANode);
                     };
                     Selector::Named(name)
                 }
@@ -88,7 +88,7 @@ impl<'a> Path<'a> {
                     Selector::Entries(Entries::parse_lexer(&mut lexer)?)
                 }
                 TokenType::EnterCurlyBracket => todo!(),
-                _ => return Err(ParseQueryError::UnexpectedToken(token)),
+                _ => return Err(ParseError::UnexpectedToken(token)),
             };
             nodes.push(selector);
         }

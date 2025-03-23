@@ -1,4 +1,4 @@
-use super::{util, ParseQueryError, Result, Value};
+use super::{util, ParseError, Result, Value};
 use crate::lexer::TokenType;
 use std::fmt::Display;
 
@@ -54,20 +54,20 @@ impl<'a> Entries<'a> {
                 }
                 TokenType::Equal => {
                     if prop_name.is_some() {
-                        return Err(ParseQueryError::DoubleEqual);
+                        return Err(ParseError::DoubleEqual);
                     }
                     let Some(EntryKind::Argument { position: _, value }) = entries.pop() else {
-                        return Err(ParseQueryError::MissingEntryIdentifier);
+                        return Err(ParseError::MissingEntryIdentifier);
                     };
                     if !is_unnamed_arg {
-                        return Err(ParseQueryError::MissingEntryIdentifier);
+                        return Err(ParseError::MissingEntryIdentifier);
                     }
                     prop_name = Some(value);
                     arg_pos -= 1;
                     is_unnamed_arg = false;
                     continue;
                 }
-                t => return Err(ParseQueryError::UnexpectedToken(t)),
+                t => return Err(ParseError::UnexpectedToken(t)),
             };
             match prop_name {
                 Some(Value::Str(name)) => {
@@ -84,7 +84,7 @@ impl<'a> Entries<'a> {
                     is_unnamed_arg = false;
                 }
                 Some(s @ Value::FloatingPoing(_)) => {
-                    return Err(ParseQueryError::UnexpectedEntryIdentifier(s))
+                    return Err(ParseError::UnexpectedEntryIdentifier(s))
                 }
                 None => {
                     entries.push(EntryKind::Argument {
@@ -96,7 +96,7 @@ impl<'a> Entries<'a> {
             }
         }
         if prop_name.is_some() {
-            return Err(ParseQueryError::MissingEntryValue);
+            return Err(ParseError::MissingEntryValue);
         }
         Ok(Entries(entries))
     }

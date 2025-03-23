@@ -2,7 +2,7 @@ use super::Value;
 use crate::lexer::TokenType;
 
 #[derive(thiserror::Error, PartialEq, Debug)]
-pub enum ParseQueryError<'a> {
+pub enum ParseError<'a> {
     #[error("unexpected token: {0}")]
     UnexpectedToken(TokenType<'a>),
     #[error("malformed string (missing \"): {0}")]
@@ -23,4 +23,4 @@ pub enum ParseQueryError<'a> {
     NotANode,
 }
 
-pub type Result<'a, T> = std::result::Result<T, ParseQueryError<'a>>;
+pub type Result<'a, T> = std::result::Result<T, ParseError<'a>>;

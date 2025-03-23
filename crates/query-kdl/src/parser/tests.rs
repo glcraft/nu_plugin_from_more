@@ -1,12 +1,12 @@
 use crate::{
     lexer::{Lexer, TokenType},
-    parser::{entries::EntryKind, util, Entries, ParseQueryError, Path, Selector, Value},
+    parser::{entries::EntryKind, util, Entries, ParseError, Path, Selector, Value},
     util::hashmap,
 };
 
 #[test]
 fn parser_strings() {
-    fn test_string(input: &str, output: Result<&str, ParseQueryError>) {
+    fn test_string(input: &str, output: Result<&str, ParseError>) {
         let mut lexer = Lexer::from(input);
         let token = lexer.next();
         assert_eq!(token, Some(TokenType::String(input)));
@@ -16,7 +16,7 @@ fn parser_strings() {
     test_string("\"hello world\"", Ok("hello world"));
     test_string(
         "\"hello world",
-        Err(ParseQueryError::MalformedString("\"hello world")),
+        Err(ParseError::MalformedString("\"hello world")),
     );
 }
 #[test]
@@ -143,35 +143,33 @@ fn entries() {
     );
     assert_eq!(
         Entries::parse_lexer(&mut Lexer::from(r#"1="#)),
-        Err(ParseQueryError::MissingEntryValue)
+        Err(ParseError::MissingEntryValue)
     );
     assert_eq!(
         Entries::parse_lexer(&mut Lexer::from(r#"name="#)),
-        Err(ParseQueryError::MissingEntryValue)
+        Err(ParseError::MissingEntryValue)
     );
     assert_eq!(
         Entries::parse_lexer(&mut Lexer::from(r#"3.1=abc"#)),
-        Err(ParseQueryError::UnexpectedEntryIdentifier(
-            Value::FloatingPoing(3.1)
-        ))
+        Err(ParseError::UnexpectedEntryIdentifier(Value::FloatingPoing(
+            3.1
+        )))
     );
     assert_eq!(
         Entries::parse_lexer(&mut Lexer::from(r#"=abc"#)),
-        Err(ParseQueryError::MissingEntryIdentifier)
+        Err(ParseError::MissingEntryIdentifier)
     );
     assert_eq!(
         Entries::parse_lexer(&mut Lexer::from(r#"1=abc =cba"#)),
-        Err(ParseQueryError::MissingEntryIdentifier)
+        Err(ParseError::MissingEntryIdentifier)
     );
     assert_eq!(
         Entries::parse_lexer(&mut Lexer::from(r#"name=abc =cba"#)),
-        Err(ParseQueryError::MissingEntryIdentifier)
+        Err(ParseError::MissingEntryIdentifier)
     );
     assert_eq!(
         Entries::parse_lexer(&mut Lexer::from(r#"name=abc [ ]"#)),
-        Err(ParseQueryError::UnexpectedToken(
-            TokenType::EnterSquareBracket
-        ))
+        Err(ParseError::UnexpectedToken(TokenType::EnterSquareBracket))
     );
 }
 #[test]
@@ -253,7 +251,7 @@ fn path_ident_parents() {
 }
 #[test]
 fn alphanum() {
-    use {ParseQueryError::*, Value::*};
+    use {ParseError::*, Value::*};
     let parse = util::parse_alphanumeric;
     assert_eq!(parse("123"), Ok(Integer(123)));
     assert_eq!(parse("-123"), Ok(Integer(-123)));
