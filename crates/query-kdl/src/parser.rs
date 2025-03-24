@@ -8,7 +8,7 @@ mod value;
 use crate::lexer::{Lexer, TokenType};
 use entries::Entries;
 pub use error::{ParseError, Result};
-use std::{borrow::Cow, collections::HashMap, fmt::Display};
+use std::{borrow::Cow, fmt::Display};
 use value::Value;
 
 #[derive(Clone, PartialEq, Debug)]
@@ -89,12 +89,15 @@ impl<'a> Path<'a> {
                 TokenType::EnterSquareBracket => {
                     Selector::Entries(Entries::parse_lexer(&mut lexer)?)
                 }
-                TokenType::EnterCurlyBracket => todo!(),
+                TokenType::EnterCurlyBracket => Self::parse_range(&mut lexer)?,
                 _ => return Err(ParseError::UnexpectedToken(token)),
             };
             nodes.push(selector);
         }
 
         return Ok(Self { nodes });
+    }
+    fn parse_range(lexer: &mut impl Iterator<Item = TokenType<'a>>) -> Result<'a, Selector<'a>> {
+        todo!()
     }
 }
