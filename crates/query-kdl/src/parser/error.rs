@@ -1,18 +1,29 @@
 use super::Value;
 use crate::lexer::TokenType;
 
-#[derive(Clone, Debug, PartialEq)]
+#[derive(thiserror::Error, Clone, Debug, PartialEq)]
 pub enum ParseStringError {
+    #[error("The string is empty")]
     EmptyString,
+    #[error("The string misses \" at the beginning")]
     MissingBeginOfString,
+    #[error("The string misses \" at the end")]
     MissingEndOfString,
+    #[error("This escape does not exists: \\{0}")]
     UnknownEscape(char),
+    #[error("Expected hexadecimal number, but had something else")]
     NotHexDigit,
-    NotAsciiCodepoint(u8),
-    NotValidCodepoint(u32),
+    #[error("Ascii escape code not valid: \\x{0:X}")]
+    AsciiNotValid(u8),
+    #[error("Unicode escape code not valid: \\u{{{0:X}}}")]
+    UnicodeNotValid(u32),
+    #[error("Unicode escape code must have at most 6 digits")]
     UnicodeMoreThanSixDigits,
+    #[error("Unicode escape code must be at most 0x10FFFF (found \\u{{{0}}})")]
     UnicodeOutOfBound(u32),
+    #[error("A curly bracket is missing")]
     ExpectedCurlyBracket,
+    #[error("Number detected as malformed")]
     MalformedNumber,
 }
 
@@ -27,7 +38,7 @@ impl ParseStringError {
 pub enum ParseError<'a> {
     #[error("unexpected token: {0}")]
     UnexpectedToken(TokenType<'a>),
-    #[error("malformed string (missing \"): {0}")]
+    #[error("The string \"{0}\" is malformed: {1}")]
     MalformedString(&'a str, ParseStringError),
     #[error("malformed number: {0}")]
     MalformedNumber(&'a str),

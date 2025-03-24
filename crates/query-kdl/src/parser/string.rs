@@ -78,7 +78,7 @@ pub fn unescape_string<'a>(input: &'a str) -> Result<String> {
                 len += 1;
                 if len == 2 {
                     if matches!(codepoint, 0 | 0x80..) {
-                        return Err(ParseStringError::NotAsciiCodepoint(codepoint));
+                        return Err(ParseStringError::AsciiNotValid(codepoint));
                     }
                     state.push_char(codepoint.into());
                 } else {
@@ -92,7 +92,7 @@ pub fn unescape_string<'a>(input: &'a str) -> Result<String> {
                     }
                     state.push_char(
                         char::from_u32(codepoint)
-                            .ok_or(ParseStringError::NotValidCodepoint(codepoint))?,
+                            .ok_or(ParseStringError::UnicodeNotValid(codepoint))?,
                     );
                 } else {
                     codepoint =
