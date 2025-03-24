@@ -315,7 +315,7 @@ fn strings() {
         Ok(Cow::Owned(String::from("aa你好世界bb")))
     );
     assert_eq!(PARSE(r#""aa\bbb""#), Err(UnknownEscape('b')));
-    assert_eq!(PARSE(r#""aa\x89bb""#), Err(NotAsciiCodepoint(0x89)));
+    assert_eq!(PARSE(r#""aa\x89bb""#), Err(AsciiNotValid(0x89)));
     assert_eq!(PARSE(r#""aa\xTRbb""#), Err(NotHexDigit));
-    assert_eq!(PARSE(r#""aa\u{DE01}bb""#), Err(NotValidCodepoint(0xDE01))); // Note: This character doesn't exists in the Unicode chart
+    assert_eq!(PARSE(r#""aa\u{DE01}bb""#), Err(UnicodeNotValid(0xDE01))); // Note: This character doesn't exists in the Unicode chart
 }
