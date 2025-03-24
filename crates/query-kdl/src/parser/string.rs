@@ -69,7 +69,7 @@ pub fn unescape_string<'a>(input: &'a str) -> Result<String> {
                     '\\' => state.push_char('\\'),
                     'x' => state.change_state(State::Ascii(0, 0)),
                     'u' => state.change_state(State::EnterUnicode),
-                    _ => todo!("error"),
+                    _ => return Err(ParseStringError::UnknownEscape(c)),
                 }
             }
             State::Ascii(mut codepoint, mut len) => {
@@ -77,6 +77,9 @@ pub fn unescape_string<'a>(input: &'a str) -> Result<String> {
                     (codepoint << 4) + c.to_digit(16).ok_or(ParseStringError::NotHexDigit)? as u8;
                 len += 1;
                 if len == 2 {
+                    if matches!(codepoint, 0 | 0x80..) {
+                        return Err(ParseStringError::NotAsciiCodepoint(codepoint));
+                    }
                     state.push_char(codepoint.into());
                 } else {
                     state.change_state(State::Ascii(codepoint, len));
@@ -84,8 +87,12 @@ pub fn unescape_string<'a>(input: &'a str) -> Result<String> {
             }
             State::Unicode(mut codepoint, mut len) => {
                 if c == '}' {
+                    if codepoint > 0x10FFFF {
+                        return Err(ParseStringError::UnicodeOutOfBound(codepoint));
+                    }
                     state.push_char(
-                        char::from_u32(codepoint).ok_or(ParseStringError::NotValidCodepoint)?,
+                        char::from_u32(codepoint)
+                            .ok_or(ParseStringError::NotValidCodepoint(codepoint))?,
                     );
                 } else {
                     codepoint =
@@ -93,7 +100,7 @@ pub fn unescape_string<'a>(input: &'a str) -> Result<String> {
                     len += 1;
                     state.change_state(State::Unicode(codepoint, len));
                     if len > 6 {
-                        return Err(ParseStringError::OutOfBoundCodepoint);
+                        return Err(ParseStringError::UnicodeMoreThanSixDigits);
                     }
                 }
             }

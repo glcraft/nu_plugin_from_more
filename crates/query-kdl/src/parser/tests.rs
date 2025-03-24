@@ -303,7 +303,19 @@ fn strings() {
     assert_eq!(PARSE(r#""""#), Ok(Cow::Borrowed("")));
     assert_eq!(PARSE(r#""abc""#), Ok(Cow::Borrowed("abc")));
     assert_eq!(
-        PARSE(r#""a\nb\nc""#),
-        Ok(Cow::Owned(String::from("a\nb\nc")))
+        PARSE(r#""a\nb\tc\rd\\e""#),
+        Ok(Cow::Owned(String::from("a\nb\tc\rd\\e")))
     );
+    assert_eq!(
+        PARSE(r#""aa\x41\x5Abb""#),
+        Ok(Cow::Owned(String::from("aaAZbb")))
+    );
+    assert_eq!(
+        PARSE(r#""aa\u{4F60}\u{597D}\u{4E16}\u{754C}bb""#),
+        Ok(Cow::Owned(String::from("aa你好世界bb")))
+    );
+    assert_eq!(PARSE(r#""aa\bbb""#), Err(UnknownEscape('b')));
+    assert_eq!(PARSE(r#""aa\x89bb""#), Err(NotAsciiCodepoint(0x89)));
+    assert_eq!(PARSE(r#""aa\xTRbb""#), Err(NotHexDigit));
+    assert_eq!(PARSE(r#""aa\u{DE01}bb""#), Err(NotValidCodepoint(0xDE01))); // Note: This character doesn't exists in the Unicode chart
 }
