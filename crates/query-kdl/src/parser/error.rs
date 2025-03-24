@@ -13,7 +13,7 @@ pub enum ParseStringError {
     UnknownEscape(char),
     #[error("Expected hexadecimal number, but had something else")]
     NotHexDigit,
-    #[error("Ascii escape code not valid: \\x{0:X}")]
+    #[error("Ascii escape code not valid: \\x{0:02X}")]
     AsciiNotValid(u8),
     #[error("Unicode escape code not valid: \\u{{{0:X}}}")]
     UnicodeNotValid(u32),
