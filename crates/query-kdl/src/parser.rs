@@ -26,7 +26,7 @@ pub enum Selector<'a> {
     /// entry selector
     Entries(Entries<'a>),
     /// ranged or indexed selection
-    Ranged(i32, Option<i32>),
+    Ranged(i64, Option<i64>),
 }
 
 impl<'a> Display for Selector<'a> {
