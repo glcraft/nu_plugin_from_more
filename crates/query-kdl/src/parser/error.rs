@@ -54,6 +54,12 @@ pub enum ParseError<'a> {
     EntriesOnMarker,
     #[error("expected a node, but got something else")]
     NotANode,
+    #[error("expected an integer number, got: {0}")]
+    RangeExpectingInteger(Value<'a>),
+    #[error("The range is empty")]
+    RangeEmpty,
+    #[error("The range separator (between numbers) is missing")]
+    RangeMissingSeparator,
 }
 
 pub type Result<'a, T> = std::result::Result<T, ParseError<'a>>;
