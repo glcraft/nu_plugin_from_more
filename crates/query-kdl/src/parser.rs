@@ -133,14 +133,21 @@ impl<'a> Path<'a> {
             };
             match token {
                 TokenType::Alphanumeric(s) => {
-                    let Value::Integer(index) =
-                        string::parse_alphanumeric(s).map_err(|e| e.into_parse_error(s))?
-                    else {
-                        todo!("error not a number");
+                    let value = string::parse_alphanumeric(s).map_err(|e| e.into_parse_error(s))?;
+                    let index = match value {
+                        Value::Integer(i) => i,
+                        t => return Err(ParseError::RangeExpectingInteger(t)),
                     };
-                    indices[has_sep as usize] = Some(index);
+                    let i = has_sep as usize;
+                    if indices[i].is_some() {
+                        return Err(ParseError::RangeMissingSeparator);
+                    }
+                    indices[i] = Some(index);
                 }
                 TokenType::DoublePoint => {
+                    if has_sep {
+                        return Err(ParseError::UnexpectedToken(TokenType::DoublePoint));
+                    }
                     has_sep = true;
                 }
                 TokenType::LeaveCurlyBracket => break,
@@ -148,7 +155,7 @@ impl<'a> Path<'a> {
             }
         }
         match (indices, has_sep) {
-            ([None, None], false) => Err(todo!("empty range")),
+            ([None, None], false) => Err(ParseError::RangeEmpty),
             ([None, None], true) => Ok(Range::All),
             ([Some(i), None], false) => Ok(Range::One(i)),
             ([Some(i), None], true) => Ok(Range::From(i)),
@@ -156,7 +163,7 @@ impl<'a> Path<'a> {
             ([None, Some(_)], false) => unreachable!(),
 
             ([Some(i), Some(j)], true) => Ok(Range::Both(i, j)),
-            ([Some(_), Some(_)], false) => Err(todo!("missing separator")),
+            ([Some(_), Some(_)], false) => Err(ParseError::RangeMissingSeparator),
         }
     }
 }
