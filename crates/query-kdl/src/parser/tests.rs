@@ -319,3 +319,15 @@ fn strings() {
     assert_eq!(PARSE(r#""aa\xTRbb""#), Err(NotHexDigit));
     assert_eq!(PARSE(r#""aa\u{DE01}bb""#), Err(UnicodeNotValid(0xDE01))); // Note: This character doesn't exists in the Unicode chart
 }
+
+#[test]
+fn ranges() {
+    use super::Range;
+    use Selector::Ranged;
+    let parse = |s| Path::parse(s).map(|v| v.nodes);
+    assert_eq!(parse("{1}"), Ok(vec![Ranged(Range::One(1))]));
+    assert_eq!(parse("{..2}"), Ok(vec![Ranged(Range::To(2))]));
+    assert_eq!(parse("{1..}"), Ok(vec![Ranged(Range::From(1))]));
+    assert_eq!(parse("{1..2}"), Ok(vec![Ranged(Range::Both(1, 2))]));
+    assert_eq!(parse("{..}"), Ok(vec![Ranged(Range::All)]));
+}
