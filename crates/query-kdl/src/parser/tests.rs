@@ -330,4 +330,30 @@ fn ranges() {
     assert_eq!(parse("{1..}"), Ok(vec![Ranged(Range::From(1))]));
     assert_eq!(parse("{1..2}"), Ok(vec![Ranged(Range::Both(1, 2))]));
     assert_eq!(parse("{..}"), Ok(vec![Ranged(Range::All)]));
+    assert_eq!(
+        parse("{abc..}"),
+        Err(ParseError::RangeExpectingInteger(Value::Str(
+            Cow::Borrowed("abc")
+        )))
+    );
+    assert_eq!(
+        parse("{..abc}"),
+        Err(ParseError::RangeExpectingInteger(Value::Str(
+            Cow::Borrowed("abc")
+        )))
+    );
+    assert_eq!(
+        parse("{1.2..}"),
+        Err(ParseError::RangeExpectingInteger(Value::FloatingPoing(1.2)))
+    );
+    assert_eq!(
+        parse("{1..2..}"),
+        Err(ParseError::UnexpectedToken(TokenType::DoublePoint))
+    );
+    assert_eq!(
+        parse("{..2..3}"),
+        Err(ParseError::UnexpectedToken(TokenType::DoublePoint))
+    );
+    assert_eq!(parse("{1 2}"), Err(ParseError::RangeMissingSeparator));
+    assert_eq!(parse("{}"), Err(ParseError::RangeEmpty));
 }
