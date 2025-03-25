@@ -26,7 +26,33 @@ pub enum Selector<'a> {
     /// entry selector
     Entries(Entries<'a>),
     /// ranged or indexed selection
-    Ranged(i64, Option<i64>),
+    Ranged(Range),
+}
+
+#[derive(Clone, PartialEq, Debug)]
+pub enum Range {
+    /// {i}
+    One(i64),
+    /// {i..}
+    From(i64),
+    /// {..j}
+    To(i64),
+    /// {i..j}
+    Both(i64, i64),
+    /// {..}
+    All,
+}
+
+impl Display for Range {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Range::One(i) => write!(f, "{{{0}}}", i),
+            Range::From(i) => write!(f, "{{{0}..}}", i),
+            Range::To(i) => write!(f, "{{..{0}}}", i),
+            Range::Both(i, j) => write!(f, "{{{0}..{1}}}", i, j),
+            Range::All => write!(f, "{{..}}"),
+        }
+    }
 }
 
 impl<'a> Display for Selector<'a> {
@@ -38,8 +64,7 @@ impl<'a> Display for Selector<'a> {
             Self::Anywhere => write!(f, "//"),
             Self::Parent => write!(f, ".."),
             Self::Entries(e) => write!(f, "{}", e),
-            Self::Ranged(beg, None) => write!(f, "{{{0}}}", beg),
-            Self::Ranged(beg, Some(end)) => write!(f, "{{{0}..{1}}}", beg, end),
+            Self::Ranged(range) => range.fmt(f),
             _ => todo!(),
         }
     }
@@ -87,9 +112,11 @@ impl<'a> Path<'a> {
                     Selector::Named(name)
                 }
                 TokenType::EnterSquareBracket => {
-                    Selector::Entries(Entries::parse_lexer(&mut lexer)?)
+                    Entries::parse_lexer(&mut lexer).map(Selector::Entries)?
                 }
-                TokenType::EnterCurlyBracket => Self::parse_range(&mut lexer)?,
+                TokenType::EnterCurlyBracket => {
+                    Self::parse_range(&mut lexer).map(Selector::Ranged)?
+                }
                 _ => return Err(ParseError::UnexpectedToken(token)),
             };
             nodes.push(selector);
@@ -97,7 +124,7 @@ impl<'a> Path<'a> {
 
         return Ok(Self { nodes });
     }
-    fn parse_range(lexer: &mut impl Iterator<Item = TokenType<'a>>) -> Result<'a, Selector<'a>> {
+    fn parse_range(lexer: &mut impl Iterator<Item = TokenType<'a>>) -> Result<'a, Range> {
         let mut indices = [None, None];
         let mut has_sep = false;
         loop {
@@ -111,31 +138,25 @@ impl<'a> Path<'a> {
                     else {
                         todo!("error not a number");
                     };
-                    if indices[0].is_some() {
-                        if !has_sep || indices[1].is_some() {
-                            return Err(ParseError::UnexpectedToken(token));
-                        }
-                        indices[1] = Some(index);
-                    } else {
-                        indices[0] = Some(index);
-                    }
+                    indices[has_sep as usize] = Some(index);
                 }
                 TokenType::DoublePoint => {
-                    if indices[1].is_some() {
-                        return Err(ParseError::UnexpectedToken(token));
-                    }
-                    if indices[0].is_none() {
-                        indices[0] = Some(0);
-                    }
                     has_sep = true;
                 }
                 TokenType::LeaveCurlyBracket => break,
                 _ => return Err(ParseError::UnexpectedToken(token)),
             }
         }
-        Ok(Selector::Ranged(
-            indices[0].ok_or_else(|| todo!("error missing value"))?,
-            indices[1],
-        ))
+        match (indices, has_sep) {
+            ([None, None], false) => Err(todo!("empty range")),
+            ([None, None], true) => Ok(Range::All),
+            ([Some(i), None], false) => Ok(Range::One(i)),
+            ([Some(i), None], true) => Ok(Range::From(i)),
+            ([None, Some(i)], true) => Ok(Range::To(i)),
+            ([None, Some(_)], false) => unreachable!(),
+
+            ([Some(i), Some(j)], true) => Ok(Range::Both(i, j)),
+            ([Some(_), Some(_)], false) => Err(todo!("missing separator")),
+        }
     }
 }
