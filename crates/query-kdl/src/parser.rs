@@ -98,6 +98,44 @@ impl<'a> Path<'a> {
         return Ok(Self { nodes });
     }
     fn parse_range(lexer: &mut impl Iterator<Item = TokenType<'a>>) -> Result<'a, Selector<'a>> {
-        todo!()
+        let mut indices = [None, None];
+        let mut has_sep = false;
+        loop {
+            let Some(token) = lexer.next() else {
+                todo!("error missing end of range");
+            };
+            match token {
+                TokenType::Alphanumeric(s) => {
+                    let Value::Integer(index) =
+                        string::parse_alphanumeric(s).map_err(|e| e.into_parse_error(s))?
+                    else {
+                        todo!("error not a number");
+                    };
+                    if indices[0].is_some() {
+                        if !has_sep || indices[1].is_some() {
+                            return Err(ParseError::UnexpectedToken(token));
+                        }
+                        indices[1] = Some(index);
+                    } else {
+                        indices[0] = Some(index);
+                    }
+                }
+                TokenType::DoublePoint => {
+                    if indices[1].is_some() {
+                        return Err(ParseError::UnexpectedToken(token));
+                    }
+                    if indices[0].is_none() {
+                        indices[0] = Some(0);
+                    }
+                    has_sep = true;
+                }
+                TokenType::LeaveCurlyBracket => break,
+                _ => return Err(ParseError::UnexpectedToken(token)),
+            }
+        }
+        Ok(Selector::Ranged(
+            indices[0].ok_or_else(|| todo!("error missing value"))?,
+            indices[1],
+        ))
     }
 }
