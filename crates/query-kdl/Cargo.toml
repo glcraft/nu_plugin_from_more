@@ -6,3 +6,9 @@ edition = "2021"
 [dependencies]
 thiserror = "2.0.9"
 
+[dependencies.kdl]
+optional = true
+version = "6.1.0"
+
+[features]
+eval = ["kdl"]

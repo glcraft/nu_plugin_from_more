@@ -1119,6 +1119,7 @@ dependencies = [
 name = "query-kdl"
 version = "0.1.0"
 dependencies = [
+ "kdl 6.1.0",
  "thiserror 2.0.9",
 ]
 
