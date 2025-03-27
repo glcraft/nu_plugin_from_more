@@ -12,7 +12,7 @@ miette = "7.4.0"
 [dependencies.query-kdl]
 version = "0.1.0"
 path = "crates/query-kdl"
-features = ["eval"]
+features = ["resolve"]
 
 [dependencies.kdl]
 version = "6.1.0"
