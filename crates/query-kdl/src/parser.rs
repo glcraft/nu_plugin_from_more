@@ -12,21 +12,46 @@ use std::{borrow::Cow, fmt::Display};
 use value::Value;
 
 #[derive(Clone, PartialEq, Debug)]
-pub enum Selector<'a> {
+pub struct Selector<'a> {
+    node: SelectorKind<'a>,
+    entries: Option<Entries<'a>>,
+}
+
+impl<'a> Display for Selector<'a> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self.node);
+        if let Some(entries) = &self.entries {
+            write!(f, "{entries}");
+        }
+        Ok(())
+    }
+}
+
+#[derive(Clone, PartialEq, Debug)]
+pub enum SelectorKind<'a> {
     /// "<name>" Node with a name
     Named(Cow<'a, str>),
     /// "*" Any nodes in the current scope
     Any,
-    /// "/" Root node
-    Root,
-    /// "//" Nodes starting anywhere in the doc
+    /// "**" Nodes starting anywhere in the doc
     Anywhere,
     /// ".." Parent node
     Parent,
-    /// entry selector
-    Entries(Entries<'a>),
     /// ranged or indexed selection
     Ranged(Range),
+}
+
+impl<'a> Display for SelectorKind<'a> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::Named(s) => write!(f, "{}", s),
+            Self::Any => write!(f, "*"),
+            Self::Anywhere => write!(f, "**"),
+            Self::Parent => write!(f, ".."),
+            Self::Ranged(range) => range.fmt(f),
+            _ => todo!(),
+        }
+    }
 }
 
 #[derive(Clone, PartialEq, Debug)]
@@ -55,26 +80,22 @@ impl Display for Range {
     }
 }
 
-impl<'a> Display for Selector<'a> {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            Self::Named(s) => write!(f, "{}", s),
-            Self::Any => write!(f, "*"),
-            Self::Root => write!(f, "/"),
-            Self::Anywhere => write!(f, "//"),
-            Self::Parent => write!(f, ".."),
-            Self::Entries(e) => write!(f, "{}", e),
-            Self::Ranged(range) => range.fmt(f),
-            _ => todo!(),
-        }
-    }
-}
-
 type Selectors<'a> = Vec<Selector<'a>>;
 #[derive(Clone, PartialEq, Debug)]
 pub struct Path<'a> {
     nodes: Selectors<'a>,
 }
+
+impl<'a> Display for Path<'a> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "/")?;
+        for node in &self.nodes {
+            write!(f, "{node}/")?;
+        }
+        Ok(())
+    }
+}
+
 impl<'a> Path<'a> {
     pub fn parse(input: &'a str) -> Result<'a, Self> {
         let mut lexer = Lexer::from(input).peekable();
