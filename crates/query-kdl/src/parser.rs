@@ -27,6 +27,15 @@ impl<'a> Display for Selector<'a> {
     }
 }
 
+impl<'a> From<SelectorKind<'a>> for Selector {
+    fn from(node: SelectorKind<'a>) -> Self {
+        Self {
+            node,
+            entries: None,
+        }
+    }
+}
+
 #[derive(Clone, PartialEq, Debug)]
 pub enum SelectorKind<'a> {
     /// "<name>" Node with a name
@@ -96,51 +105,68 @@ impl<'a> Display for Path<'a> {
     }
 }
 
+struct NodeBuilder<'a>(Option<Selector<'a>>);
+
+impl<'a> NodeBuilder<'a> {
+    fn new() -> Self {
+        Self(None)
+    }
+    fn set_node(&mut self, node: SelectorKind<'a>) -> std::result::Result<(), ()> {
+        if self.0.is_some() {
+            return Err(());
+        }
+        self.0.insert(Selector::from(node));
+        Ok(())
+    }
+    fn set_entries(&mut self, entries: Entries<'a>) -> std::result::Result<(), ()> {
+        let Some(node) = self.0.as_mut() else {
+            todo!("error missing node");
+        };
+        if node.entries.is_some() {
+            todo!("error entries already defined");
+        }
+        node.entries.insert(entries);
+        Ok(())
+    }
+    fn pop(&mut self) -> std::result::Result<Selector<'a>, ()> {
+        self.0.take().ok_or_else(|| todo!("error missing node"))
+    }
+}
+
 impl<'a> Path<'a> {
     pub fn parse(input: &'a str) -> Result<'a, Self> {
         let mut lexer = Lexer::from(input).peekable();
         let mut nodes = Vec::new();
-
+        let mut node_builder = NodeBuilder::new();
         loop {
             let Some(token) = lexer.next() else {
                 break;
             };
-            let selector = match token {
-                TokenType::Slash => {
-                    if nodes.is_empty() {
-                        Selector::Root
-                    } else {
-                        continue;
-                    }
-                }
-                TokenType::DoubleSlash => {
-                    if nodes.is_empty() {
-                        Selector::Anywhere
-                    } else {
-                        return Err(ParseError::UnexpectedToken(token));
-                    }
-                }
-                TokenType::Star => Selector::Any,
-                TokenType::DoublePoint => Selector::Parent,
-                TokenType::String(s) => {
-                    Selector::Named(string::parse_string(s).map_err(|e| e.into_parse_error(s))?)
-                }
+            match token {
+                TokenType::Slash => nodes.push(node_builder.pop()?),
+                TokenType::Star => node_builder.set_node(SelectorKind::Any)?,
+                TokenType::DoubleStar => node_builder.set_node(SelectorKind::Anywhere)?,
+                TokenType::DoublePoint => node_builder.set_node(SelectorKind::Parent)?,
+                TokenType::String(s) => node_builder.set_node(SelectorKind::Named(
+                    string::parse_string(s).map_err(|e| e.into_parse_error(s))?,
+                ))?,
                 TokenType::Alphanumeric(s) => {
                     let value = string::parse_alphanumeric(s).map_err(|e| e.into_parse_error(s))?;
                     let Value::Str(name) = value else {
                         return Err(ParseError::NotANode);
                     };
-                    Selector::Named(name)
+                    node_builder.set_node(SelectorKind::Named(name))?
                 }
                 TokenType::EnterSquareBracket => {
-                    Entries::parse_lexer(&mut lexer).map(Selector::Entries)?
+                    node_builder.set_entries(Entries::parse_lexer(&mut lexer)?)?
                 }
-                TokenType::EnterCurlyBracket => {
-                    Self::parse_range(&mut lexer).map(Selector::Ranged)?
-                }
+                TokenType::EnterCurlyBracket => node_builder
+                    .set_node(Self::parse_range(&mut lexer).map(SelectorKind::Ranged)?)?,
                 _ => return Err(ParseError::UnexpectedToken(token)),
-            };
-            nodes.push(selector);
+            }
+        }
+        if let Some(node) = node_builder.0 {
+            nodes.push(node);
         }
 
         return Ok(Self { nodes });
