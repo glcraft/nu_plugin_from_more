@@ -7,6 +7,7 @@ pub enum TokenType<'a> {
     Point,
     DoublePoint,
     Star,
+    DoubleStar,
     EnterSquareBracket,
     LeaveSquareBracket,
     EnterCurlyBracket,
@@ -26,6 +27,7 @@ impl<'a> std::fmt::Display for TokenType<'a> {
             TokenType::Point => write!(f, "."),
             TokenType::DoublePoint => write!(f, ".."),
             TokenType::Star => write!(f, "*"),
+            TokenType::DoubleStar => write!(f, "**"),
             TokenType::EnterSquareBracket => write!(f, "["),
             TokenType::LeaveSquareBracket => write!(f, "]"),
             TokenType::EnterCurlyBracket => write!(f, "{{"),
@@ -135,7 +137,13 @@ impl<'a> Lexer<'a> {
                 }
                 Some(_) | None => Point,
             },
-            '*' => Star,
+            '*' => match iter_chars.next() {
+                Some((l, '*')) => {
+                    offset += l;
+                    DoubleStar
+                }
+                Some(_) | None => Star,
+            },
             '=' => Equal,
             '|' => Pipe,
             c => Unknown(&self.input[0..c.len_utf8()]),
@@ -244,12 +252,14 @@ mod tests {
     }
     #[test]
     fn token_relatives() {
-        let mut lexer = Lexer::from("/./..//*");
+        let mut lexer = Lexer::from("/./../**/*");
         assert_eq!(lexer.next(), Some(TokenType::Slash));
         assert_eq!(lexer.next(), Some(TokenType::Point));
         assert_eq!(lexer.next(), Some(TokenType::Slash));
         assert_eq!(lexer.next(), Some(TokenType::DoublePoint));
-        assert_eq!(lexer.next(), Some(TokenType::DoubleSlash));
+        assert_eq!(lexer.next(), Some(TokenType::Slash));
+        assert_eq!(lexer.next(), Some(TokenType::DoubleStar));
+        assert_eq!(lexer.next(), Some(TokenType::Slash));
         assert_eq!(lexer.next(), Some(TokenType::Star));
         assert_eq!(lexer.next(), None);
     }
