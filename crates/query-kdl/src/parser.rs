@@ -6,15 +6,15 @@ mod tests;
 mod value;
 
 use crate::lexer::{Lexer, TokenType};
-use entries::Entries;
+pub use entries::{Entries, EntryKind};
 pub use error::{ParseError, Result};
 use std::{borrow::Cow, fmt::Display};
-use value::Value;
+pub use value::Value;
 
 #[derive(Clone, PartialEq, Debug)]
 pub struct Node<'a> {
-    node: NodeKind<'a>,
-    entries: Option<Entries<'a>>,
+    pub node: NodeKind<'a>,
+    pub entries: Option<Entries<'a>>,
 }
 
 impl<'a> Display for Node<'a> {
@@ -211,5 +211,9 @@ impl<'a> Path<'a> {
             ([Some(i), Some(j)], true) => Ok(Range::Both(i, j)),
             ([Some(_), Some(_)], false) => Err(ParseError::RangeMissingSeparator),
         }
+    }
+    #[inline]
+    fn nodes(&self) -> &[Node] {
+        &self.nodes
     }
 }
