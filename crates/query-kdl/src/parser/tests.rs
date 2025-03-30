@@ -325,6 +325,24 @@ fn nodes_with_entries() {
             ]
         })
     );
+
+    assert_eq!(
+        Path::parse("node1[1][2]"),
+        Err(ParseError::EntriesAlreadyDefined)
+    );
+    assert_eq!(
+        Path::parse("node1 node2"),
+        Err(ParseError::NodeAlreadyDefined)
+    );
+    assert_eq!(
+        Path::parse("node1 node2 [1]"),
+        Err(ParseError::NodeAlreadyDefined)
+    );
+    assert_eq!(
+        Path::parse("node1 [1] node2"),
+        Err(ParseError::NodeAlreadyDefined)
+    );
+    assert_eq!(Path::parse("node1/[1]"), Err(ParseError::MissingNode));
 }
 #[test]
 fn alphanum() {
