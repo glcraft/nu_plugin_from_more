@@ -12,21 +12,55 @@ use std::{borrow::Cow, fmt::Display};
 use value::Value;
 
 #[derive(Clone, PartialEq, Debug)]
-pub enum Selector<'a> {
+pub struct Node<'a> {
+    node: NodeKind<'a>,
+    entries: Option<Entries<'a>>,
+}
+
+impl<'a> Display for Node<'a> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self.node)?;
+        if let Some(entries) = &self.entries {
+            write!(f, "{entries}")?;
+        }
+        Ok(())
+    }
+}
+
+impl<'a> From<NodeKind<'a>> for Node<'a> {
+    fn from(node: NodeKind<'a>) -> Self {
+        Self {
+            node,
+            entries: None,
+        }
+    }
+}
+
+#[derive(Clone, PartialEq, Debug)]
+pub enum NodeKind<'a> {
     /// "<name>" Node with a name
     Named(Cow<'a, str>),
     /// "*" Any nodes in the current scope
     Any,
-    /// "/" Root node
-    Root,
-    /// "//" Nodes starting anywhere in the doc
+    /// "**" Nodes starting anywhere in the doc
     Anywhere,
     /// ".." Parent node
     Parent,
-    /// entry selector
-    Entries(Entries<'a>),
     /// ranged or indexed selection
     Ranged(Range),
+}
+
+impl<'a> Display for NodeKind<'a> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::Named(s) => write!(f, "{}", s),
+            Self::Any => write!(f, "*"),
+            Self::Anywhere => write!(f, "**"),
+            Self::Parent => write!(f, ".."),
+            Self::Ranged(range) => range.fmt(f),
+            _ => todo!(),
+        }
+    }
 }
 
 #[derive(Clone, PartialEq, Debug)]
@@ -55,73 +89,85 @@ impl Display for Range {
     }
 }
 
-impl<'a> Display for Selector<'a> {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            Self::Named(s) => write!(f, "{}", s),
-            Self::Any => write!(f, "*"),
-            Self::Root => write!(f, "/"),
-            Self::Anywhere => write!(f, "//"),
-            Self::Parent => write!(f, ".."),
-            Self::Entries(e) => write!(f, "{}", e),
-            Self::Ranged(range) => range.fmt(f),
-            _ => todo!(),
-        }
-    }
-}
-
-type Selectors<'a> = Vec<Selector<'a>>;
+type Selectors<'a> = Vec<Node<'a>>;
 #[derive(Clone, PartialEq, Debug)]
 pub struct Path<'a> {
     nodes: Selectors<'a>,
 }
+
+impl<'a> Display for Path<'a> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        for node in &self.nodes {
+            write!(f, "{node}/")?;
+        }
+        Ok(())
+    }
+}
+
+struct NodeBuilder<'a>(Option<Node<'a>>);
+
+impl<'a> NodeBuilder<'a> {
+    fn new() -> Self {
+        Self(None)
+    }
+    fn set_node(&mut self, node: NodeKind<'a>) -> Result<'a, ()> {
+        if self.0.is_some() {
+            return Err(ParseError::NodeAlreadyDefined);
+        }
+        let _ = self.0.insert(Node::from(node));
+        Ok(())
+    }
+    fn set_entries(&mut self, entries: Entries<'a>) -> Result<'a, ()> {
+        let Some(node) = self.0.as_mut() else {
+            return Err(ParseError::MissingNode);
+        };
+        if node.entries.is_some() {
+            return Err(ParseError::EntriesAlreadyDefined);
+        }
+        let _ = node.entries.insert(entries);
+        Ok(())
+    }
+    fn pop(&mut self) -> Result<'a, Node<'a>> {
+        self.0.take().ok_or_else(|| todo!("error missing node"))
+    }
+}
+
 impl<'a> Path<'a> {
     pub fn parse(input: &'a str) -> Result<'a, Self> {
         let mut lexer = Lexer::from(input).peekable();
         let mut nodes = Vec::new();
-
+        let mut node_builder = NodeBuilder::new();
         loop {
             let Some(token) = lexer.next() else {
                 break;
             };
-            let selector = match token {
-                TokenType::Slash => {
-                    if nodes.is_empty() {
-                        Selector::Root
-                    } else {
-                        continue;
-                    }
-                }
-                TokenType::DoubleSlash => {
-                    if nodes.is_empty() {
-                        Selector::Anywhere
-                    } else {
-                        return Err(ParseError::UnexpectedToken(token));
-                    }
-                }
-                TokenType::Star => Selector::Any,
-                TokenType::DoublePoint => Selector::Parent,
-                TokenType::String(s) => {
-                    Selector::Named(string::parse_string(s).map_err(|e| e.into_parse_error(s))?)
-                }
+            match token {
+                TokenType::Slash => nodes.push(node_builder.pop()?),
+                TokenType::Star => node_builder.set_node(NodeKind::Any)?,
+                TokenType::DoubleStar => node_builder.set_node(NodeKind::Anywhere)?,
+                TokenType::DoublePoint => node_builder.set_node(NodeKind::Parent)?,
+                TokenType::String(s) => node_builder.set_node(NodeKind::Named(
+                    string::parse_string(s).map_err(|e| e.into_parse_error(s))?,
+                ))?,
                 TokenType::Alphanumeric(s) => {
                     let value = string::parse_alphanumeric(s).map_err(|e| e.into_parse_error(s))?;
                     let Value::Str(name) = value else {
                         return Err(ParseError::NotANode);
                     };
-                    Selector::Named(name)
+                    node_builder.set_node(NodeKind::Named(name))?
                 }
                 TokenType::EnterSquareBracket => {
-                    Entries::parse_lexer(&mut lexer).map(Selector::Entries)?
+                    node_builder.set_entries(Entries::parse_lexer(&mut lexer)?)?
                 }
                 TokenType::EnterCurlyBracket => {
-                    Self::parse_range(&mut lexer).map(Selector::Ranged)?
+                    node_builder.set_node(Self::parse_range(&mut lexer).map(NodeKind::Ranged)?)?
                 }
                 _ => return Err(ParseError::UnexpectedToken(token)),
-            };
-            nodes.push(selector);
+            }
         }
-
+        if let Some(node) = node_builder.0 {
+            nodes.push(node);
+        }
         return Ok(Self { nodes });
     }
     fn parse_range(lexer: &mut impl Iterator<Item = TokenType<'a>>) -> Result<'a, Range> {

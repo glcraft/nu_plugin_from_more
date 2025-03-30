@@ -40,8 +40,6 @@ pub enum ParseError<'a> {
     UnexpectedToken(TokenType<'a>),
     #[error("The string \"{0}\" is malformed: {1}")]
     MalformedString(&'a str, ParseStringError),
-    #[error("malformed number: {0}")]
-    MalformedNumber(&'a str),
     #[error("double equal in entries")]
     DoubleEqual,
     #[error("missing entry value after an equal")]
@@ -54,6 +52,12 @@ pub enum ParseError<'a> {
     EntriesOnMarker,
     #[error("expected a node, but got something else")]
     NotANode,
+    #[error("missing node before entries")]
+    MissingNode,
+    #[error("A node is already defined before")]
+    NodeAlreadyDefined,
+    #[error("The entries is already defined before")]
+    EntriesAlreadyDefined,
     #[error("expected an integer number, got: {0}")]
     RangeExpectingInteger(Value<'a>),
     #[error("The range is empty")]

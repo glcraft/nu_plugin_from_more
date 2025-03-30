@@ -3,11 +3,12 @@ use std::borrow::Cow;
 use crate::{
     lexer::{Lexer, TokenType},
     parser::{
-        entries::EntryKind, error::ParseStringError, string, Entries, ParseError, Path, Selector,
-        Value,
+        entries::EntryKind, error::ParseStringError, string, Entries, Node, ParseError, Path, Value,
     },
     util::hashmap,
 };
+
+use super::NodeKind;
 #[test]
 fn parser_strings() {
     fn test_string(input: &str, output: Result<&str, ParseError>) {
@@ -182,12 +183,17 @@ fn entries() {
         Err(ParseError::UnexpectedToken(TokenType::EnterSquareBracket))
     );
 }
+
+// fn node_only(node: SelectorKind) -> Selector<'a> {
+
+// }
+
 #[test]
 fn path_named_one() {
     assert_eq!(
         Path::parse("node_name"),
         Ok(Path {
-            nodes: vec![Selector::Named(Cow::Borrowed("node_name"))]
+            nodes: vec![Node::from(NodeKind::Named(Cow::Borrowed("node_name")))]
         })
     );
 }
@@ -198,8 +204,8 @@ fn path_named_multi() {
         Path::parse("node1/node2"),
         Ok(Path {
             nodes: vec![
-                Selector::Named(Cow::Borrowed("node1")),
-                Selector::Named(Cow::Borrowed("node2")),
+                Node::from(NodeKind::Named(Cow::Borrowed("node1"))),
+                Node::from(NodeKind::Named(Cow::Borrowed("node2"))),
             ]
         })
     );
@@ -211,38 +217,41 @@ fn path_named_strings() {
         Path::parse(r#""node 1"/"node 2""#),
         Ok(Path {
             nodes: vec![
-                Selector::Named(Cow::Borrowed("node 1")),
-                Selector::Named(Cow::Borrowed("node 2")),
+                Node::from(NodeKind::Named(Cow::Borrowed("node 1"))),
+                Node::from(NodeKind::Named(Cow::Borrowed("node 2"))),
             ]
         })
     );
 }
-#[test]
-fn path_ident_root() {
-    assert_eq!(
-        Path::parse(r#"/node1"#),
-        Ok(Path {
-            nodes: vec![Selector::Root, Selector::Named(Cow::Borrowed("node1"))]
-        })
-    );
-    assert_eq!(
-        Path::parse(r#"/node1/node2"#),
-        Ok(Path {
-            nodes: vec![
-                Selector::Root,
-                Selector::Named(Cow::Borrowed("node1")),
-                Selector::Named(Cow::Borrowed("node2"))
-            ]
-        })
-    );
-}
+// #[test]
+// fn path_ident_root() {
+//     assert_eq!(
+//         Path::parse(r#"/node1"#),
+//         Ok(Path {
+//             nodes: vec![Node::from(NodeKind::Root(, Node::from(NodeKind::Named((Cow::Borrowed("node1"))]
+//         })
+//     );
+//     assert_eq!(
+//         Path::parse(r#"/node1/node2"#),
+//         Ok(Path {
+//             nodes: vec![
+//                 Node::from(NodeKind::Root(,
+//                 Node::from(NodeKind::Named((Cow::Borrowed("node1")),
+//                 Node::from(NodeKind::Named((Cow::Borrowed("node2"))
+//             ]
+//         })
+//     );
+// }
 
 #[test]
 fn path_ident_anywhere() {
     assert_eq!(
-        Path::parse(r#"//node1"#),
+        Path::parse(r#"**/node1"#),
         Ok(Path {
-            nodes: vec![Selector::Anywhere, Selector::Named(Cow::Borrowed("node1"))]
+            nodes: vec![
+                Node::from(NodeKind::Anywhere),
+                Node::from(NodeKind::Named(Cow::Borrowed("node1")))
+            ]
         })
     );
 }
@@ -250,12 +259,11 @@ fn path_ident_anywhere() {
 #[test]
 fn path_ident_any() {
     assert_eq!(
-        Path::parse(r#"/*/node1"#),
+        Path::parse(r#"*/node1"#),
         Ok(Path {
             nodes: vec![
-                Selector::Root,
-                Selector::Any,
-                Selector::Named(Cow::Borrowed("node1"))
+                Node::from(NodeKind::Any),
+                Node::from(NodeKind::Named(Cow::Borrowed("node1")))
             ]
         })
     );
@@ -263,15 +271,78 @@ fn path_ident_any() {
 #[test]
 fn path_ident_parents() {
     assert_eq!(
-        Path::parse(r#"/../node1"#),
+        Path::parse(r#"../node1"#),
         Ok(Path {
             nodes: vec![
-                Selector::Root,
-                Selector::Parent,
-                Selector::Named(Cow::Borrowed("node1"))
+                Node::from(NodeKind::Parent),
+                Node::from(NodeKind::Named(Cow::Borrowed("node1")))
             ]
         })
     );
+}
+
+#[test]
+fn nodes_with_entries() {
+    assert_eq!(
+        Path::parse(r#"..[1]/node1[2]/*[3]/**[4]/{1..2}[5]"#),
+        Ok(Path {
+            nodes: vec![
+                Node {
+                    node: NodeKind::Parent,
+                    entries: Some(Entries::from(vec![EntryKind::Argument {
+                        position: 0,
+                        value: Value::Integer(1)
+                    },]))
+                },
+                Node {
+                    node: NodeKind::Named(Cow::Borrowed("node1")),
+                    entries: Some(Entries::from(vec![EntryKind::Argument {
+                        position: 0,
+                        value: Value::Integer(2)
+                    },]))
+                },
+                Node {
+                    node: NodeKind::Any,
+                    entries: Some(Entries::from(vec![EntryKind::Argument {
+                        position: 0,
+                        value: Value::Integer(3)
+                    },]))
+                },
+                Node {
+                    node: NodeKind::Anywhere,
+                    entries: Some(Entries::from(vec![EntryKind::Argument {
+                        position: 0,
+                        value: Value::Integer(4)
+                    },]))
+                },
+                Node {
+                    node: NodeKind::Ranged(crate::parser::Range::Both(1, 2)),
+                    entries: Some(Entries::from(vec![EntryKind::Argument {
+                        position: 0,
+                        value: Value::Integer(5)
+                    },]))
+                },
+            ]
+        })
+    );
+
+    assert_eq!(
+        Path::parse("node1[1][2]"),
+        Err(ParseError::EntriesAlreadyDefined)
+    );
+    assert_eq!(
+        Path::parse("node1 node2"),
+        Err(ParseError::NodeAlreadyDefined)
+    );
+    assert_eq!(
+        Path::parse("node1 node2 [1]"),
+        Err(ParseError::NodeAlreadyDefined)
+    );
+    assert_eq!(
+        Path::parse("node1 [1] node2"),
+        Err(ParseError::NodeAlreadyDefined)
+    );
+    assert_eq!(Path::parse("node1/[1]"), Err(ParseError::MissingNode));
 }
 #[test]
 fn alphanum() {
@@ -323,13 +394,16 @@ fn strings() {
 #[test]
 fn ranges() {
     use super::Range;
-    use Selector::Ranged;
+    use NodeKind::Ranged;
     let parse = |s| Path::parse(s).map(|v| v.nodes);
-    assert_eq!(parse("{1}"), Ok(vec![Ranged(Range::One(1))]));
-    assert_eq!(parse("{..2}"), Ok(vec![Ranged(Range::To(2))]));
-    assert_eq!(parse("{1..}"), Ok(vec![Ranged(Range::From(1))]));
-    assert_eq!(parse("{1..2}"), Ok(vec![Ranged(Range::Both(1, 2))]));
-    assert_eq!(parse("{..}"), Ok(vec![Ranged(Range::All)]));
+    assert_eq!(parse("{1}"), Ok(vec![Node::from(Ranged(Range::One(1)))]));
+    assert_eq!(parse("{..2}"), Ok(vec![Node::from(Ranged(Range::To(2)))]));
+    assert_eq!(parse("{1..}"), Ok(vec![Node::from(Ranged(Range::From(1)))]));
+    assert_eq!(
+        parse("{1..2}"),
+        Ok(vec![Node::from(Ranged(Range::Both(1, 2)))])
+    );
+    assert_eq!(parse("{..}"), Ok(vec![Node::from(Ranged(Range::All))]));
     assert_eq!(
         parse("{abc..}"),
         Err(ParseError::RangeExpectingInteger(Value::Str(
