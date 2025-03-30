@@ -151,7 +151,7 @@ impl<'a> Path<'a> {
                 ))?,
                 TokenType::Alphanumeric(s) => {
                     let value = string::parse_alphanumeric(s).map_err(|e| e.into_parse_error(s))?;
-                    let Value::Str(name) = value else {
+                    let Value::String(name) = value else {
                         return Err(ParseError::NotANode);
                     };
                     node_builder.set_node(NodeKind::Named(name))?

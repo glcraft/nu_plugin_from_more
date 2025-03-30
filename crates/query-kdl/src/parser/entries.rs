@@ -56,7 +56,7 @@ impl<'a> Entries<'a> {
                 }
                 TokenType::String(s) => {
                     is_unnamed_arg = true;
-                    Value::Str(string::parse_string(s).map_err(|e| e.into_parse_error(s))?)
+                    Value::String(string::parse_string(s).map_err(|e| e.into_parse_error(s))?)
                 }
                 TokenType::Equal => {
                     if prop_name.is_some() {
@@ -76,7 +76,7 @@ impl<'a> Entries<'a> {
                 t => return Err(ParseError::UnexpectedToken(t)),
             };
             match prop_name {
-                Some(Value::Str(name)) => {
+                Some(Value::String(name)) => {
                     entries.push(EntryKind::Property { name, value });
                     prop_name = None;
                     is_unnamed_arg = false;
@@ -89,9 +89,7 @@ impl<'a> Entries<'a> {
                     prop_name = None;
                     is_unnamed_arg = false;
                 }
-                Some(s @ Value::FloatingPoing(_)) => {
-                    return Err(ParseError::UnexpectedEntryIdentifier(s))
-                }
+                Some(s @ _) => return Err(ParseError::UnexpectedEntryIdentifier(s)),
                 None => {
                     entries.push(EntryKind::Argument {
                         position: arg_pos,
@@ -105,6 +103,9 @@ impl<'a> Entries<'a> {
             return Err(ParseError::MissingEntryValue);
         }
         Ok(Entries(entries))
+    }
+    pub fn entries(&self) -> &[EntryKind] {
+        &self.0
     }
 }
 impl<'a> Default for Entries<'a> {

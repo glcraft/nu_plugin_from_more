@@ -152,7 +152,7 @@ pub fn parse_alphanumeric<'a>(input: &'a str) -> Result<Value<'a>> {
             .parse()
             .map(Value::FloatingPoing)
             .map_err(|_| ParseStringError::MalformedNumber)?,
-        Str => Value::Str(Cow::Borrowed(input)),
+        Str => Value::String(Cow::Borrowed(input)),
     };
     Ok(result)
 }

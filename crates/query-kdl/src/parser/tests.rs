@@ -58,7 +58,7 @@ fn entries() {
             },
             EntryKind::Argument {
                 position: 1,
-                value: Value::Str(Cow::Borrowed("abc"))
+                value: Value::String(Cow::Borrowed("abc"))
             },
             EntryKind::Argument {
                 position: 2,
@@ -71,11 +71,11 @@ fn entries() {
         Ok(Entries::from(vec![
             EntryKind::Property {
                 name: Cow::Borrowed("a"),
-                value: Value::Str(Cow::Borrowed("b"))
+                value: Value::String(Cow::Borrowed("b"))
             },
             EntryKind::Property {
                 name: Cow::Borrowed("c"),
-                value: Value::Str(Cow::Borrowed("d"))
+                value: Value::String(Cow::Borrowed("d"))
             },
         ]))
     );
@@ -88,7 +88,7 @@ fn entries() {
             },
             EntryKind::Property {
                 name: Cow::Borrowed("name2"),
-                value: Value::Str(Cow::Borrowed("abc"))
+                value: Value::String(Cow::Borrowed("abc"))
             },
             EntryKind::Property {
                 name: Cow::Borrowed("name3"),
@@ -105,7 +105,7 @@ fn entries() {
             },
             EntryKind::Argument {
                 position: 2,
-                value: Value::Str(Cow::Borrowed("abc"))
+                value: Value::String(Cow::Borrowed("abc"))
             },
             EntryKind::Argument {
                 position: 3,
@@ -140,7 +140,7 @@ fn entries() {
             },
             EntryKind::Property {
                 name: Cow::Borrowed("p r o p"),
-                value: Value::Str(Cow::Borrowed("v a l u e"))
+                value: Value::String(Cow::Borrowed("v a l u e"))
             },
             EntryKind::Argument {
                 position: 3,
@@ -362,10 +362,10 @@ fn alphanum() {
     assert_eq!(PARSE("-1.2.3"), Err(MalformedNumber));
     assert_eq!(PARSE("1c0"), Err(MalformedNumber));
     assert_eq!(PARSE("-1c0"), Err(MalformedNumber));
-    assert_eq!(PARSE("abc"), Ok(Str(Cow::Borrowed("abc"))));
-    assert_eq!(PARSE("-abc"), Ok(Str(Cow::Borrowed("-abc"))));
-    assert_eq!(PARSE("a1c"), Ok(Str(Cow::Borrowed("a1c"))));
-    assert_eq!(PARSE("-a1c"), Ok(Str(Cow::Borrowed("-a1c"))));
+    assert_eq!(PARSE("abc"), Ok(String(Cow::Borrowed("abc"))));
+    assert_eq!(PARSE("-abc"), Ok(String(Cow::Borrowed("-abc"))));
+    assert_eq!(PARSE("a1c"), Ok(String(Cow::Borrowed("a1c"))));
+    assert_eq!(PARSE("-a1c"), Ok(String(Cow::Borrowed("-a1c"))));
 }
 #[test]
 fn strings() {
@@ -406,13 +406,13 @@ fn ranges() {
     assert_eq!(parse("{..}"), Ok(vec![Node::from(Ranged(Range::All))]));
     assert_eq!(
         parse("{abc..}"),
-        Err(ParseError::RangeExpectingInteger(Value::Str(
+        Err(ParseError::RangeExpectingInteger(Value::String(
             Cow::Borrowed("abc")
         )))
     );
     assert_eq!(
         parse("{..abc}"),
-        Err(ParseError::RangeExpectingInteger(Value::Str(
+        Err(ParseError::RangeExpectingInteger(Value::String(
             Cow::Borrowed("abc")
         )))
     );
