@@ -111,14 +111,14 @@ impl<'a> NodeBuilder<'a> {
     fn new() -> Self {
         Self(None)
     }
-    fn set_node(&mut self, node: SelectorKind<'a>) -> std::result::Result<(), ()> {
+    fn set_node(&mut self, node: SelectorKind<'a>) -> Result<'a, ()> {
         if self.0.is_some() {
-            return Err(());
+            todo!("error node already defined");
         }
         self.0.insert(Selector::from(node));
         Ok(())
     }
-    fn set_entries(&mut self, entries: Entries<'a>) -> std::result::Result<(), ()> {
+    fn set_entries(&mut self, entries: Entries<'a>) -> Result<'a, ()> {
         let Some(node) = self.0.as_mut() else {
             todo!("error missing node");
         };
@@ -128,7 +128,7 @@ impl<'a> NodeBuilder<'a> {
         node.entries.insert(entries);
         Ok(())
     }
-    fn pop(&mut self) -> std::result::Result<Selector<'a>, ()> {
+    fn pop(&mut self) -> Result<'a, Selector<'a>> {
         self.0.take().ok_or_else(|| todo!("error missing node"))
     }
 }
@@ -168,7 +168,6 @@ impl<'a> Path<'a> {
         if let Some(node) = node_builder.0 {
             nodes.push(node);
         }
-
         return Ok(Self { nodes });
     }
     fn parse_range(lexer: &mut impl Iterator<Item = TokenType<'a>>) -> Result<'a, Range> {
