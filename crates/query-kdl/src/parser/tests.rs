@@ -285,29 +285,46 @@ fn path_ident_parents() {
 }
 
 #[test]
-fn node_with_entries() {
+fn nodes_with_entries() {
     assert_eq!(
-        Path::parse(r#"..[1 2 3]/node1"#),
+        Path::parse(r#"..[1]/node1[2]/*[3]/**[4]/{1..2}[5]"#),
         Ok(Path {
             nodes: vec![
                 Selector {
                     node: SelectorKind::Parent,
-                    entries: Some(Entries::from(vec![
-                        EntryKind::Argument {
-                            position: 0,
-                            value: Value::Integer(1)
-                        },
-                        EntryKind::Argument {
-                            position: 1,
-                            value: Value::Integer(2)
-                        },
-                        EntryKind::Argument {
-                            position: 2,
-                            value: Value::Integer(3)
-                        },
-                    ]))
+                    entries: Some(Entries::from(vec![EntryKind::Argument {
+                        position: 0,
+                        value: Value::Integer(1)
+                    },]))
                 },
-                Selector::from(SelectorKind::Named(Cow::Borrowed("node1")))
+                Selector {
+                    node: SelectorKind::Named(Cow::Borrowed("node1")),
+                    entries: Some(Entries::from(vec![EntryKind::Argument {
+                        position: 0,
+                        value: Value::Integer(2)
+                    },]))
+                },
+                Selector {
+                    node: SelectorKind::Any,
+                    entries: Some(Entries::from(vec![EntryKind::Argument {
+                        position: 0,
+                        value: Value::Integer(3)
+                    },]))
+                },
+                Selector {
+                    node: SelectorKind::Anywhere,
+                    entries: Some(Entries::from(vec![EntryKind::Argument {
+                        position: 0,
+                        value: Value::Integer(4)
+                    },]))
+                },
+                Selector {
+                    node: SelectorKind::Ranged(crate::parser::Range::Both(1, 2)),
+                    entries: Some(Entries::from(vec![EntryKind::Argument {
+                        position: 0,
+                        value: Value::Integer(5)
+                    },]))
+                },
             ]
         })
     );
