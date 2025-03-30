@@ -53,7 +53,7 @@ pub enum ParseError<'a> {
     #[error("expected a node, but got something else")]
     NotANode,
     #[error("missing node before entries")]
-    MIssingNode,
+    MissingNode,
     #[error("A node is already defined before")]
     NodeAlreadyDefined,
     #[error("The entries is already defined before")]

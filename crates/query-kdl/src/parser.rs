@@ -119,7 +119,7 @@ impl<'a> NodeBuilder<'a> {
     }
     fn set_entries(&mut self, entries: Entries<'a>) -> Result<'a, ()> {
         let Some(node) = self.0.as_mut() else {
-            return Err(ParseError::MIssingNode);
+            return Err(ParseError::MissingNode);
         };
         if node.entries.is_some() {
             return Err(ParseError::EntriesAlreadyDefined);
