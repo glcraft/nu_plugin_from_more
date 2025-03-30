@@ -113,17 +113,17 @@ impl<'a> NodeBuilder<'a> {
     }
     fn set_node(&mut self, node: SelectorKind<'a>) -> Result<'a, ()> {
         if self.0.is_some() {
-            todo!("error node already defined");
+            return Err(ParseError::NodeAlreadyDefined);
         }
         let _ = self.0.insert(Selector::from(node));
         Ok(())
     }
     fn set_entries(&mut self, entries: Entries<'a>) -> Result<'a, ()> {
         let Some(node) = self.0.as_mut() else {
-            todo!("error missing node");
+            return Err(ParseError::MIssingNode);
         };
         if node.entries.is_some() {
-            todo!("error entries already defined");
+            return Err(ParseError::EntriesAlreadyDefined);
         }
         let _ = node.entries.insert(entries);
         Ok(())
