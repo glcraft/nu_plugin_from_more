@@ -19,15 +19,15 @@ pub struct Selector<'a> {
 
 impl<'a> Display for Selector<'a> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}", self.node);
+        write!(f, "{}", self.node)?;
         if let Some(entries) = &self.entries {
-            write!(f, "{entries}");
+            write!(f, "{entries}")?;
         }
         Ok(())
     }
 }
 
-impl<'a> From<SelectorKind<'a>> for Selector {
+impl<'a> From<SelectorKind<'a>> for Selector<'a> {
     fn from(node: SelectorKind<'a>) -> Self {
         Self {
             node,
@@ -115,7 +115,7 @@ impl<'a> NodeBuilder<'a> {
         if self.0.is_some() {
             todo!("error node already defined");
         }
-        self.0.insert(Selector::from(node));
+        let _ = self.0.insert(Selector::from(node));
         Ok(())
     }
     fn set_entries(&mut self, entries: Entries<'a>) -> Result<'a, ()> {
@@ -125,7 +125,7 @@ impl<'a> NodeBuilder<'a> {
         if node.entries.is_some() {
             todo!("error entries already defined");
         }
-        node.entries.insert(entries);
+        let _ = node.entries.insert(entries);
         Ok(())
     }
     fn pop(&mut self) -> Result<'a, Selector<'a>> {
