@@ -12,12 +12,12 @@ use std::{borrow::Cow, fmt::Display};
 use value::Value;
 
 #[derive(Clone, PartialEq, Debug)]
-pub struct Selector<'a> {
-    node: SelectorKind<'a>,
+pub struct Node<'a> {
+    node: NodeKind<'a>,
     entries: Option<Entries<'a>>,
 }
 
-impl<'a> Display for Selector<'a> {
+impl<'a> Display for Node<'a> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "{}", self.node)?;
         if let Some(entries) = &self.entries {
@@ -27,8 +27,8 @@ impl<'a> Display for Selector<'a> {
     }
 }
 
-impl<'a> From<SelectorKind<'a>> for Selector<'a> {
-    fn from(node: SelectorKind<'a>) -> Self {
+impl<'a> From<NodeKind<'a>> for Node<'a> {
+    fn from(node: NodeKind<'a>) -> Self {
         Self {
             node,
             entries: None,
@@ -37,7 +37,7 @@ impl<'a> From<SelectorKind<'a>> for Selector<'a> {
 }
 
 #[derive(Clone, PartialEq, Debug)]
-pub enum SelectorKind<'a> {
+pub enum NodeKind<'a> {
     /// "<name>" Node with a name
     Named(Cow<'a, str>),
     /// "*" Any nodes in the current scope
@@ -50,7 +50,7 @@ pub enum SelectorKind<'a> {
     Ranged(Range),
 }
 
-impl<'a> Display for SelectorKind<'a> {
+impl<'a> Display for NodeKind<'a> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             Self::Named(s) => write!(f, "{}", s),
@@ -89,7 +89,7 @@ impl Display for Range {
     }
 }
 
-type Selectors<'a> = Vec<Selector<'a>>;
+type Selectors<'a> = Vec<Node<'a>>;
 #[derive(Clone, PartialEq, Debug)]
 pub struct Path<'a> {
     nodes: Selectors<'a>,
@@ -104,17 +104,17 @@ impl<'a> Display for Path<'a> {
     }
 }
 
-struct NodeBuilder<'a>(Option<Selector<'a>>);
+struct NodeBuilder<'a>(Option<Node<'a>>);
 
 impl<'a> NodeBuilder<'a> {
     fn new() -> Self {
         Self(None)
     }
-    fn set_node(&mut self, node: SelectorKind<'a>) -> Result<'a, ()> {
+    fn set_node(&mut self, node: NodeKind<'a>) -> Result<'a, ()> {
         if self.0.is_some() {
             return Err(ParseError::NodeAlreadyDefined);
         }
-        let _ = self.0.insert(Selector::from(node));
+        let _ = self.0.insert(Node::from(node));
         Ok(())
     }
     fn set_entries(&mut self, entries: Entries<'a>) -> Result<'a, ()> {
@@ -127,7 +127,7 @@ impl<'a> NodeBuilder<'a> {
         let _ = node.entries.insert(entries);
         Ok(())
     }
-    fn pop(&mut self) -> Result<'a, Selector<'a>> {
+    fn pop(&mut self) -> Result<'a, Node<'a>> {
         self.0.take().ok_or_else(|| todo!("error missing node"))
     }
 }
@@ -143,10 +143,10 @@ impl<'a> Path<'a> {
             };
             match token {
                 TokenType::Slash => nodes.push(node_builder.pop()?),
-                TokenType::Star => node_builder.set_node(SelectorKind::Any)?,
-                TokenType::DoubleStar => node_builder.set_node(SelectorKind::Anywhere)?,
-                TokenType::DoublePoint => node_builder.set_node(SelectorKind::Parent)?,
-                TokenType::String(s) => node_builder.set_node(SelectorKind::Named(
+                TokenType::Star => node_builder.set_node(NodeKind::Any)?,
+                TokenType::DoubleStar => node_builder.set_node(NodeKind::Anywhere)?,
+                TokenType::DoublePoint => node_builder.set_node(NodeKind::Parent)?,
+                TokenType::String(s) => node_builder.set_node(NodeKind::Named(
                     string::parse_string(s).map_err(|e| e.into_parse_error(s))?,
                 ))?,
                 TokenType::Alphanumeric(s) => {
@@ -154,13 +154,14 @@ impl<'a> Path<'a> {
                     let Value::Str(name) = value else {
                         return Err(ParseError::NotANode);
                     };
-                    node_builder.set_node(SelectorKind::Named(name))?
+                    node_builder.set_node(NodeKind::Named(name))?
                 }
                 TokenType::EnterSquareBracket => {
                     node_builder.set_entries(Entries::parse_lexer(&mut lexer)?)?
                 }
-                TokenType::EnterCurlyBracket => node_builder
-                    .set_node(Self::parse_range(&mut lexer).map(SelectorKind::Ranged)?)?,
+                TokenType::EnterCurlyBracket => {
+                    node_builder.set_node(Self::parse_range(&mut lexer).map(NodeKind::Ranged)?)?
+                }
                 _ => return Err(ParseError::UnexpectedToken(token)),
             }
         }
