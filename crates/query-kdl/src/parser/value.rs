@@ -5,7 +5,7 @@ pub enum Value<'a> {
     /// String
     String(Cow<'a, str>),
     /// Integer
-    Integer(i64),
+    Integer(i128),
     /// Floating point
     FloatingPoing(f64),
     /// Boolean

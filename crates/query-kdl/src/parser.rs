@@ -66,13 +66,13 @@ impl<'a> Display for NodeKind<'a> {
 #[derive(Clone, PartialEq, Debug)]
 pub enum Range {
     /// {i}
-    One(i64),
+    One(i128),
     /// {i..}
-    From(i64),
+    From(i128),
     /// {..j}
-    To(i64),
+    To(i128),
     /// {i..j}
-    Both(i64, i64),
+    Both(i128, i128),
     /// {..}
     All,
 }

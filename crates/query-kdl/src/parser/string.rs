@@ -145,7 +145,7 @@ pub fn parse_alphanumeric<'a>(input: &'a str) -> Result<Value<'a>> {
         Str
     };
     let result = match kind {
-        Int(radix) => i64::from_str_radix(&input2[(2 * ((radix != 10) as usize))..], radix)
+        Int(radix) => i128::from_str_radix(&input2[(2 * ((radix != 10) as usize))..], radix)
             .map(|v| Value::Integer(v * sign))
             .map_err(|_| ParseStringError::MalformedNumber)?,
         Float => input

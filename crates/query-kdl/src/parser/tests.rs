@@ -369,7 +369,7 @@ fn alphanum() {
 }
 #[test]
 fn strings() {
-    use {ParseStringError::*, Value::*};
+    use ParseStringError::*;
     const PARSE: fn(&str) -> Result<Cow<'_, str>, ParseStringError> = string::parse_string;
     assert_eq!(PARSE(r#""""#), Ok(Cow::Borrowed("")));
     assert_eq!(PARSE(r#""abc""#), Ok(Cow::Borrowed("abc")));
