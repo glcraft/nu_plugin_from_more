@@ -10,7 +10,7 @@ pub fn resolve_document<'a, 'b>(doc: &'a KdlDocument, query: Path<'b>) -> Vec<&'
 
 struct Resolver<'a> {
     doc: &'a KdlDocument,
-    current_node: Vec<&'a KdlNode>,
+    current_node: Vec<&'a KdlDocument>,
     found_nodes: Vec<&'a KdlNode>,
 }
 
@@ -25,38 +25,50 @@ impl<'a> From<&'a KdlDocument> for Resolver<'a> {
 }
 
 impl<'a> Resolver<'a> {
-    fn resolve<'b>(&mut self, query: Path<'b>) -> Vec<&'a KdlNode> {
-        todo!()
+    fn resolve<'b>(&mut self, query: Path<'b>) -> &Vec<&'a KdlNode> {
+        self.current_node.clear();
+        self.found_nodes.clear();
+        // let kdl_nodes =
+        self.resolve_impl(query.nodes(), self.doc);
+        &self.found_nodes
     }
-    fn resolve_impl<'b>(&mut self, query: &'b [Node], kdl_node: &'a KdlNode) {
+    fn resolve_impl<'b>(&mut self, query: &'b [Node], kdl_doc: &'a KdlDocument) {
         let query_node = unsafe { query.last().unwrap_unchecked() };
         let compare_entries = |entries: &[KdlEntry]| {
             query_node
                 .entries
                 .as_ref()
                 .map(|query_entries| entries == query_entries)
+                .or(Some(true))
                 == Some(true)
         };
+        // let Some(kdl_doc) = kdl_node.children() else {
+        //     return;
+        // };
+        let kdl_nodes = kdl_doc.nodes();
         match &query_node.node {
             NodeKind::Named(name) => {
                 let it = kdl_nodes.iter().filter(|kdl_node| {
                     kdl_node.name().repr().unwrap() == name && compare_entries(kdl_node.entries())
                 });
-                self.check(&query[1..], it);
+                self.check(&query[1..], Some(kdl_doc), it);
             }
-            NodeKind::Any => kdl_nodes
-                .iter()
-                .for_each(|kdl_node| compare_entries(kdl_node.entries())),
+            NodeKind::Any => {
+                let it = kdl_nodes
+                    .iter()
+                    .filter(|kdl_node| compare_entries(kdl_node.entries()));
+                self.check(&query[1..], Some(kdl_doc), it);
+            }
             NodeKind::Anywhere => unimplemented!(),
             NodeKind::Parent => {
                 let kdl_node_parent = self.current_node.pop();
                 let Some(kdl_node_parent) = kdl_node_parent else {
                     return;
                 };
-                if compare_entries(kdl_node_parent.entries()) {
-                    // self.check(&query[1..], , std::iter::once(kdl_node_parent));
-                    todo!("special case")
-                }
+                // if compare_entries(kdl_node_parent.entries()) {
+                // self.check(&query[1..], None, std::iter::once(kdl_node_parent));
+                todo!("special case");
+                // }
                 self.current_node.push(kdl_node_parent);
             }
             NodeKind::Ranged(range) => {
@@ -71,28 +83,34 @@ impl<'a> Resolver<'a> {
 
                 self.check(
                     &query[1..],
-                    node,
+                    Some(kdl_doc),
                     it.filter(|node| compare_entries(node.entries())),
                 );
             }
         }
-        todo!()
     }
     #[inline]
     fn check<'b>(
         &mut self,
         query: &'b [Node],
-        kdl_node_parent: &'a KdlNode,
+        kdl_node_parent: Option<&'a KdlDocument>,
         kdl_nodes: impl Iterator<Item = &'a KdlNode>,
     ) {
         if query.is_empty() {
             kdl_nodes.for_each(|kdl_node| self.found_nodes.push(kdl_node));
         } else {
-            self.current_node.push(kdl_node_parent);
-            for kdl_node in kdl_nodes {
-                self.resolve_impl(query, kdl_node);
+            let has_parent = kdl_node_parent.is_some();
+            if let Some(parent) = kdl_node_parent {
+                self.current_node.push(parent);
             }
-            let _ = self.current_node.pop();
+            for kdl_node in kdl_nodes {
+                if let Some(kdl_doc) = kdl_node.children() {
+                    self.resolve_impl(query, kdl_doc);
+                }
+            }
+            if has_parent {
+                let _ = self.current_node.pop();
+            }
         }
     }
 }
