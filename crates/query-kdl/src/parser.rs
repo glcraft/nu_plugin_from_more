@@ -213,7 +213,7 @@ impl<'a> Path<'a> {
         }
     }
     #[inline]
-    fn nodes(&self) -> &[Node] {
+    pub fn nodes(&self) -> &[Node] {
         &self.nodes
     }
 }
