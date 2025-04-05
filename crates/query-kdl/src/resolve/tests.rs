@@ -14,11 +14,22 @@ static KDL_DOC: LazyLock<KdlDocument> = LazyLock::new(|| {
         node2
         node3 a b c
         node_prop hello=world foo=bar
+        node_children {
+            node1 1
+            node2 2
+            node3 3
+        }
         node4 {
             contents {
                 section "First section" {
                     paragraph "This is the first paragraph"
                     paragraph "This is the second paragraph"
+                }
+            }
+            contents {
+                section "First section" {
+                    paragraph "This is the third paragraph"
+                    paragraph "This is the forth paragraph"
                 }
             }
         }
@@ -45,6 +56,9 @@ impl PartialEq<TestNode> for KdlNode {
 
 impl<'a> PartialEq<TestNodes> for Vec<&'a KdlNode> {
     fn eq(&self, other: &TestNodes) -> bool {
+        if self.len() != other.0.len() {
+            return false;
+        }
         for (left, right) in self.iter().zip(other.0.iter()) {
             if **left != *right {
                 return false;
@@ -60,7 +74,7 @@ fn entries(input: &'static str) -> Entries<'static> {
 }
 
 #[test]
-fn document() {
+fn query_named_node() {
     let query = Path::parse("node2").unwrap();
     let mut resolver = Resolver::from(&*KDL_DOC);
     resolver.resolve(query);
@@ -73,6 +87,66 @@ fn document() {
             },
             TestNode {
                 name: "node2",
+                entries: Entries::default()
+            }
+        ])
+    );
+}
+#[test]
+fn query_any_node() {
+    let query = Path::parse("node_children/*").unwrap();
+
+    println!("{:#?}", query);
+    let mut resolver = Resolver::from(&*KDL_DOC);
+    assert_eq!(
+        *resolver.resolve(query),
+        TestNodes(vec![
+            TestNode {
+                name: "node1",
+                entries: entries("1")
+            },
+            TestNode {
+                name: "node2",
+                entries: entries("2")
+            },
+            TestNode {
+                name: "node3",
+                entries: entries("3")
+            },
+        ])
+    );
+}
+#[test]
+fn query_parent_node() {
+    let query = Path::parse("node_children/node1/..").unwrap();
+    let mut resolver = Resolver::from(&*KDL_DOC);
+    resolver.resolve(query);
+    assert_eq!(
+        resolver.found_nodes,
+        TestNodes(vec![TestNode {
+            name: "node_children",
+            entries: Entries::default()
+        },])
+    );
+}
+#[test]
+fn query_parent_node_multi() {
+    let query = Path::parse("node_children/*/..").unwrap();
+    let mut resolver = Resolver::from(&*KDL_DOC);
+    resolver.resolve(query);
+    assert_eq!(
+        resolver.found_nodes,
+        TestNodes(vec![
+            TestNode {
+                name: "node_children",
+                entries: Entries::default()
+            },
+            TestNode {
+                name: "node_children",
+                entries: Entries::default()
+            },
+            TestNode {
+                name: "node_children",
                 entries: Entries::default()
             }
         ])
