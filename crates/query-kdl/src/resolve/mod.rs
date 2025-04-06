@@ -12,7 +12,6 @@ struct Resolver<'k> {
 
 impl<'k> Resolver<'k> {
     fn resolve<'q>(kdl_doc: &'k KdlDocument, query: Path<'q>) -> Vec<&'k KdlNode> {
-        println!("# resolve. query: {:?}", query);
         let mut r = Resolver {
             current_nodes: Vec::with_capacity(query.nodes().len()),
             found_nodes: Vec::new(),
@@ -35,10 +34,6 @@ impl<'k> Resolver<'k> {
                 .unwrap_or(true)
         };
 
-        println!(
-            "# resolve_query_node, query: {:?}, query next: {:?}",
-            query, query_next
-        );
         match &query_node.node {
             NodeKind::Named(query_name) => {
                 let it = it_nodes.filter(|kdl_node| {
@@ -54,7 +49,6 @@ impl<'k> Resolver<'k> {
             NodeKind::Any => self.dispatch(query_next, it_nodes),
             NodeKind::Anywhere => todo!(),
             NodeKind::Parent => {
-                println!("# enter parent. current nodes: {:?}", self.current_nodes);
                 let Some(parent) = self.current_nodes.pop() else {
                     return;
                 };
