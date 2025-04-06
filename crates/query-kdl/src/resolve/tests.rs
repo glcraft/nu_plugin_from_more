@@ -84,10 +84,9 @@ fn entries(input: &'static str) -> Entries<'static> {
 #[test]
 fn query_named_node() {
     let query = Path::parse("node2").unwrap();
-    let mut resolver = Resolver::from(&*KDL_DOC);
-    resolver.resolve(query);
+    let found = Resolver::resolve(&*KDL_DOC, query);
     assert_eq!(
-        resolver.found_nodes,
+        found,
         TestNodes(vec![
             TestNode {
                 name: "node2",
@@ -105,9 +104,9 @@ fn query_any_node() {
     let query = Path::parse("node_children/*").unwrap();
 
     println!("{:#?}", query);
-    let mut resolver = Resolver::from(&*KDL_DOC);
+    let found = Resolver::resolve(&*KDL_DOC, query);
     assert_eq!(
-        *resolver.resolve(query),
+        found,
         TestNodes(vec![
             TestNode {
                 name: "node1",
@@ -127,10 +126,9 @@ fn query_any_node() {
 #[test]
 fn query_parent_node() {
     let query = Path::parse("node_children/node1/..").unwrap();
-    let mut resolver = Resolver::from(&*KDL_DOC);
-    resolver.resolve(query);
+    let found = Resolver::resolve(&*KDL_DOC, query);
     assert_eq!(
-        resolver.found_nodes,
+        found,
         TestNodes(vec![TestNode {
             name: "node_children",
             entries: Entries::default()
@@ -140,10 +138,9 @@ fn query_parent_node() {
 #[test]
 fn query_parent_node_multi() {
     let query = Path::parse("node_children/*/..").unwrap();
-    let mut resolver = Resolver::from(&*KDL_DOC);
-    resolver.resolve(query);
+    let found = Resolver::resolve(&*KDL_DOC, query);
     assert_eq!(
-        resolver.found_nodes,
+        found,
         TestNodes(vec![
             TestNode {
                 name: "node_children",
@@ -162,12 +159,11 @@ fn query_parent_node_multi() {
 }
 #[test]
 fn query_range() {
-    let mut resolver = Resolver::from(&*KDL_DOC);
     assert_eq!(
-        *resolver.resolve(Path::parse("node2/{1}").unwrap()),
+        Resolver::resolve(&*KDL_DOC, Path::parse("node_multiple/{1}").unwrap()),
         TestNodes(vec![TestNode {
-            name: "node2",
-            entries: Entries::default()
+            name: "node",
+            entries: entries("2")
         },])
     );
 }

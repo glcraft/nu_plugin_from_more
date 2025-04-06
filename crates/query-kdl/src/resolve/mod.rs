@@ -1,63 +1,32 @@
 mod ops;
 #[cfg(test)]
 mod tests;
-use crate::parser::{Entries, Node, NodeKind, Path, Range, Value};
-use kdl::{KdlDocument, KdlEntry, KdlNode, KdlValue};
+use kdl::{KdlDocument, KdlEntry, KdlNode};
 
-pub fn resolve_document<'a, 'b>(doc: &'a KdlDocument, query: Path<'b>) -> Vec<&'a KdlNode> {
-    todo!()
+use crate::parser::{Node as QueryNode, NodeKind, Path};
+
+struct Resolver<'k> {
+    current_nodes: Vec<&'k KdlNode>,
+    found_nodes: Vec<&'k KdlNode>,
 }
 
-enum NodeOrDoc<'a> {
-    Node(&'a KdlNode),
-    Doc(&'a KdlDocument),
-}
-
-impl<'a> From<&'a KdlNode> for NodeOrDoc<'a> {
-    fn from(value: &'a KdlNode) -> Self {
-        Self::Node(value)
-    }
-}
-impl<'a> From<&'a KdlDocument> for NodeOrDoc<'a> {
-    fn from(value: &'a KdlDocument) -> Self {
-        Self::Doc(value)
-    }
-}
-
-impl<'a> NodeOrDoc<'a> {
-    fn document(&self) -> Option<&'a KdlDocument> {
-        match self {
-            NodeOrDoc::Node(kdl_node) => kdl_node.children(),
-            NodeOrDoc::Doc(kdl_document) => Some(&kdl_document),
-        }
-    }
-}
-
-struct Resolver<'a> {
-    doc: &'a KdlDocument,
-    current_node: Vec<NodeOrDoc<'a>>,
-    found_nodes: Vec<&'a KdlNode>,
-}
-
-impl<'a> From<&'a KdlDocument> for Resolver<'a> {
-    fn from(doc: &'a KdlDocument) -> Self {
-        Self {
-            doc,
-            current_node: Vec::new(),
+impl<'k> Resolver<'k> {
+    fn resolve<'q>(kdl_doc: &'k KdlDocument, query: Path<'q>) -> Vec<&'k KdlNode> {
+        println!("# resolve. query: {:?}", query);
+        let mut r = Resolver {
+            current_nodes: Vec::with_capacity(query.nodes().len()),
             found_nodes: Vec::new(),
-        }
+        };
+        r.resolve_query_node(query.nodes(), kdl_doc.nodes().iter());
+        r.found_nodes
     }
-}
-
-impl<'a> Resolver<'a> {
-    fn resolve<'b>(&mut self, query: Path<'b>) -> &Vec<&'a KdlNode> {
-        self.current_node.clear();
-        self.found_nodes.clear();
-        self.resolve_impl(query.nodes(), self.doc.into());
-        &self.found_nodes
-    }
-    fn resolve_impl<'b>(&mut self, query: &'b [Node], kdl_orig: NodeOrDoc<'a>) {
+    fn resolve_query_node<'q>(
+        &mut self,
+        query: &'q [QueryNode],
+        it_nodes: impl Iterator<Item = &'k KdlNode>,
+    ) {
         let query_node = unsafe { query.first().unwrap_unchecked() };
+        let query_next = &query[1..];
         let compare_entries = |entries: &[KdlEntry]| {
             query_node
                 .entries
@@ -65,26 +34,14 @@ impl<'a> Resolver<'a> {
                 .map(|query_entries| entries == query_entries)
                 .unwrap_or(true)
         };
-        if matches!(&query_node.node, NodeKind::Parent) {
-            let kdl_node_parent = self.current_node.pop();
-            let Some(kdl_node_parent) = kdl_node_parent else {
-                return;
-            };
-            let NodeOrDoc::Node(kdl_node_parent) = kdl_node_parent else {
-                self.current_node.push(kdl_node_parent);
-                return;
-            };
-            self.check(&query[1..], None, std::iter::once(kdl_node_parent));
-            self.current_node.push(NodeOrDoc::Node(kdl_node_parent));
-            return;
-        }
-        let Some(kdl_doc) = kdl_orig.document() else {
-            return;
-        };
-        let kdl_nodes = kdl_doc.nodes();
+
+        println!(
+            "# resolve_query_node, query: {:?}, query next: {:?}",
+            query, query_next
+        );
         match &query_node.node {
             NodeKind::Named(query_name) => {
-                let it = kdl_nodes.iter().filter(|kdl_node| {
+                let it = it_nodes.filter(|kdl_node| {
                     kdl_node
                         .name()
                         .repr()
@@ -92,55 +49,52 @@ impl<'a> Resolver<'a> {
                         .unwrap_or(false)
                         && compare_entries(kdl_node.entries())
                 });
-
-                self.check(&query[1..], Some(kdl_orig), it);
+                self.dispatch(query_next, it);
             }
-            NodeKind::Any => {
-                let it = kdl_nodes
-                    .iter()
-                    .filter(|kdl_node| compare_entries(kdl_node.entries()));
-                self.check(&query[1..], Some(kdl_orig), it);
-            }
-            NodeKind::Anywhere => unimplemented!(),
-            NodeKind::Parent => unreachable!("already defined on top"),
-            NodeKind::Ranged(range) => {
-                let it = kdl_nodes.iter();
-                let it = match range {
-                    Range::One(i) => it.skip(*i as _).take(1),
-                    Range::From(from) => it.skip(*from as _).take(usize::MAX),
-                    Range::To(to) => it.skip(0).take(*to as _),
-                    Range::Both(from, to) => it.skip(*from as _).take((to - from) as _),
-                    Range::All => it.skip(0).take(usize::MAX),
+            NodeKind::Any => self.dispatch(query_next, it_nodes),
+            NodeKind::Anywhere => todo!(),
+            NodeKind::Parent => {
+                println!("# enter parent. current nodes: {:?}", self.current_nodes);
+                let Some(parent) = self.current_nodes.pop() else {
+                    return;
                 };
-
-                self.check(
-                    &query[1..],
-                    Some(kdl_orig),
-                    it.filter(|node| compare_entries(node.entries())),
-                );
+                self.dispatch(query_next, std::iter::once(parent));
+                self.current_nodes.push(parent);
             }
+            NodeKind::Ranged(range) => match range {
+                crate::parser::Range::One(index) => {
+                    self.dispatch(query_next, it_nodes.skip(*index as _).take(1))
+                }
+                crate::parser::Range::From(from) => {
+                    self.dispatch(query_next, it_nodes.skip(*from as _))
+                }
+                crate::parser::Range::To(to) => self.dispatch(query_next, it_nodes.take(*to as _)),
+                crate::parser::Range::Both(from, to) => self.dispatch(
+                    query_next,
+                    it_nodes.skip(*from as _).take((*to - *from) as _),
+                ),
+                crate::parser::Range::All => self.dispatch(query_next, it_nodes),
+            },
         }
     }
-    #[inline]
-    fn check<'b>(
+    fn dispatch<'q>(
         &mut self,
-        query: &'b [Node],
-        kdl_node_parent: Option<NodeOrDoc<'a>>,
-        kdl_nodes: impl Iterator<Item = &'a KdlNode> + Clone,
+        query: &'q [QueryNode],
+        it_nodes: impl Iterator<Item = &'k KdlNode>,
     ) {
         if query.is_empty() {
-            kdl_nodes.for_each(|kdl_node| self.found_nodes.push(kdl_node));
+            it_nodes.for_each(|kdl_node| self.found_nodes.push(&kdl_node));
             return;
         }
-        let has_parent = kdl_node_parent.is_some();
-        if let Some(parent) = kdl_node_parent {
-            self.current_node.push(parent);
-        }
-        for kdl_node in kdl_nodes {
-            self.resolve_impl(query, kdl_node.into());
-        }
-        if has_parent {
-            let _ = self.current_node.pop();
+
+        for kdl_node in it_nodes {
+            let Some(kdl_doc) = kdl_node.children() else {
+                self.resolve_query_node(query, std::iter::empty());
+                continue;
+            };
+            self.current_nodes.push(kdl_node);
+            self.resolve_query_node(query, kdl_doc.nodes().iter());
+            let _ = self.current_nodes.pop();
         }
     }
 }
