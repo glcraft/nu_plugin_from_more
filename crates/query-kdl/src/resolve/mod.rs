@@ -115,7 +115,7 @@ impl<'a> Resolver<'a> {
 
                 self.check(
                     &query[1..],
-                    Some(kdl_orig.into()),
+                    Some(kdl_orig),
                     it.filter(|node| compare_entries(node.entries())),
                 );
             }
