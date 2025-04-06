@@ -13,11 +13,19 @@ static KDL_DOC: LazyLock<KdlDocument> = LazyLock::new(|| {
         node2 1 2 3
         node2
         node3 a b c
+        node3 0 2 0
         node_prop hello=world foo=bar
         node_children {
             node1 1
             node2 2
             node3 3
+        }
+        node_multiple {
+            node 1
+            node 2
+            node 3
+            node 4
+            node 5
         }
         node4 {
             contents {
@@ -150,5 +158,16 @@ fn query_parent_node_multi() {
                 entries: Entries::default()
             }
         ])
+    );
+}
+#[test]
+fn query_range() {
+    let mut resolver = Resolver::from(&*KDL_DOC);
+    assert_eq!(
+        *resolver.resolve(Path::parse("node2/{1}").unwrap()),
+        TestNodes(vec![TestNode {
+            name: "node2",
+            entries: Entries::default()
+        },])
     );
 }
