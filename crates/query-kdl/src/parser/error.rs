@@ -56,8 +56,10 @@ pub enum ParseError<'a> {
     MissingNode,
     #[error("A node is already defined before")]
     NodeAlreadyDefined,
-    #[error("The entries is already defined before")]
+    #[error("The entries was already defined for this node")]
     EntriesAlreadyDefined,
+    #[error("The range was already defined for this node")]
+    RangeAlreadyDefined,
     #[error("expected an integer number, got: {0}")]
     RangeExpectingInteger(Value<'a>),
     #[error("The range is empty")]

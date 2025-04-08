@@ -284,7 +284,7 @@ fn path_ident_parents() {
 #[test]
 fn nodes_with_entries() {
     assert_eq!(
-        Path::parse(r#"..[1]/node1[2]/*[3]/**[4]/{1..2}[5]"#),
+        Path::parse(r#"..[1]/node1[2]/*[3]/**[4]"#),
         Ok(Path {
             nodes: vec![
                 Node {
@@ -292,35 +292,32 @@ fn nodes_with_entries() {
                     entries: Some(Entries::from(vec![EntryKind::Argument {
                         position: 0,
                         value: Value::Integer(1)
-                    },]))
+                    },])),
+                    range: None,
                 },
                 Node {
                     node: NodeKind::Named(Cow::Borrowed("node1")),
                     entries: Some(Entries::from(vec![EntryKind::Argument {
                         position: 0,
                         value: Value::Integer(2)
-                    },]))
+                    },])),
+                    range: None,
                 },
                 Node {
                     node: NodeKind::Any,
                     entries: Some(Entries::from(vec![EntryKind::Argument {
                         position: 0,
                         value: Value::Integer(3)
-                    },]))
+                    },])),
+                    range: None,
                 },
                 Node {
                     node: NodeKind::Anywhere,
                     entries: Some(Entries::from(vec![EntryKind::Argument {
                         position: 0,
                         value: Value::Integer(4)
-                    },]))
-                },
-                Node {
-                    node: NodeKind::Ranged(crate::parser::Range::Both(1, 2)),
-                    entries: Some(Entries::from(vec![EntryKind::Argument {
-                        position: 0,
-                        value: Value::Integer(5)
-                    },]))
+                    },])),
+                    range: None,
                 },
             ]
         })
@@ -346,88 +343,89 @@ fn nodes_with_entries() {
 }
 #[test]
 fn alphanum() {
+    use string::parse_alphanumeric as parse;
     use {ParseStringError::*, Value::*};
-    const PARSE: fn(&str) -> Result<Value<'_>, ParseStringError> = string::parse_alphanumeric;
-    assert_eq!(PARSE("123"), Ok(Integer(123)));
-    assert_eq!(PARSE("-123"), Ok(Integer(-123)));
-    assert_eq!(PARSE("0x123"), Ok(Integer(0x123)));
-    assert_eq!(PARSE("0b101"), Ok(Integer(0b101)));
-    assert_eq!(PARSE("0o123"), Ok(Integer(0o123)));
-    assert_eq!(PARSE("-0x123"), Ok(Integer(-0x123)));
-    assert_eq!(PARSE("-0b101"), Ok(Integer(-0b101)));
-    assert_eq!(PARSE("-0o123"), Ok(Integer(-0o123)));
-    assert_eq!(PARSE("1.23"), Ok(FloatingPoing(1.23)));
-    assert_eq!(PARSE("-1.23"), Ok(FloatingPoing(-1.23)));
-    assert_eq!(PARSE("1.2.3"), Err(MalformedNumber));
-    assert_eq!(PARSE("-1.2.3"), Err(MalformedNumber));
-    assert_eq!(PARSE("1c0"), Err(MalformedNumber));
-    assert_eq!(PARSE("-1c0"), Err(MalformedNumber));
-    assert_eq!(PARSE("abc"), Ok(String(Cow::Borrowed("abc"))));
-    assert_eq!(PARSE("-abc"), Ok(String(Cow::Borrowed("-abc"))));
-    assert_eq!(PARSE("a1c"), Ok(String(Cow::Borrowed("a1c"))));
-    assert_eq!(PARSE("-a1c"), Ok(String(Cow::Borrowed("-a1c"))));
+    assert_eq!(parse("123"), Ok(Integer(123)));
+    assert_eq!(parse("-123"), Ok(Integer(-123)));
+    assert_eq!(parse("0x123"), Ok(Integer(0x123)));
+    assert_eq!(parse("0b101"), Ok(Integer(0b101)));
+    assert_eq!(parse("0o123"), Ok(Integer(0o123)));
+    assert_eq!(parse("-0x123"), Ok(Integer(-0x123)));
+    assert_eq!(parse("-0b101"), Ok(Integer(-0b101)));
+    assert_eq!(parse("-0o123"), Ok(Integer(-0o123)));
+    assert_eq!(parse("1.23"), Ok(FloatingPoing(1.23)));
+    assert_eq!(parse("-1.23"), Ok(FloatingPoing(-1.23)));
+    assert_eq!(parse("1.2.3"), Err(MalformedNumber));
+    assert_eq!(parse("-1.2.3"), Err(MalformedNumber));
+    assert_eq!(parse("1c0"), Err(MalformedNumber));
+    assert_eq!(parse("-1c0"), Err(MalformedNumber));
+    assert_eq!(parse("abc"), Ok(String(Cow::Borrowed("abc"))));
+    assert_eq!(parse("-abc"), Ok(String(Cow::Borrowed("-abc"))));
+    assert_eq!(parse("a1c"), Ok(String(Cow::Borrowed("a1c"))));
+    assert_eq!(parse("-a1c"), Ok(String(Cow::Borrowed("-a1c"))));
 }
 #[test]
 fn strings() {
+    use string::parse_string as parse;
     use ParseStringError::*;
-    const PARSE: fn(&str) -> Result<Cow<'_, str>, ParseStringError> = string::parse_string;
-    assert_eq!(PARSE(r#""""#), Ok(Cow::Borrowed("")));
-    assert_eq!(PARSE(r#""abc""#), Ok(Cow::Borrowed("abc")));
+    assert_eq!(parse(r#""""#), Ok(Cow::Borrowed("")));
+    assert_eq!(parse(r#""abc""#), Ok(Cow::Borrowed("abc")));
     assert_eq!(
-        PARSE(r#""a\nb\tc\rd\\e""#),
+        parse(r#""a\nb\tc\rd\\e""#),
         Ok(Cow::Owned(String::from("a\nb\tc\rd\\e")))
     );
     assert_eq!(
-        PARSE(r#""aa\x41\x5Abb""#),
+        parse(r#""aa\x41\x5Abb""#),
         Ok(Cow::Owned(String::from("aaAZbb")))
     );
     assert_eq!(
-        PARSE(r#""aa\u{4F60}\u{597D}\u{4E16}\u{754C}bb""#),
+        parse(r#""aa\u{4F60}\u{597D}\u{4E16}\u{754C}bb""#),
         Ok(Cow::Owned(String::from("aa你好世界bb")))
     );
-    assert_eq!(PARSE(r#""aa\bbb""#), Err(UnknownEscape('b')));
-    assert_eq!(PARSE(r#""aa\x89bb""#), Err(AsciiNotValid(0x89)));
-    assert_eq!(PARSE(r#""aa\xTRbb""#), Err(NotHexDigit));
-    assert_eq!(PARSE(r#""aa\u{DE01}bb""#), Err(UnicodeNotValid(0xDE01))); // Note: This character doesn't exists in the Unicode chart
+    assert_eq!(parse(r#""aa\bbb""#), Err(UnknownEscape('b')));
+    assert_eq!(parse(r#""aa\x89bb""#), Err(AsciiNotValid(0x89)));
+    assert_eq!(parse(r#""aa\xTRbb""#), Err(NotHexDigit));
+    assert_eq!(parse(r#""aa\u{DE01}bb""#), Err(UnicodeNotValid(0xDE01))); // Note: This character doesn't exists in the Unicode chart
 }
 
 #[test]
 fn ranges() {
     use super::Range;
-    use NodeKind::Ranged;
+    let make_node = |range| Node {
+        node: NodeKind::Any,
+        entries: None,
+        range: Some(range),
+    };
     let parse = |s| Path::parse(s).map(|v| v.nodes);
-    assert_eq!(parse("{1}"), Ok(vec![Node::from(Ranged(Range::One(1)))]));
-    assert_eq!(parse("{..2}"), Ok(vec![Node::from(Ranged(Range::To(2)))]));
-    assert_eq!(parse("{1..}"), Ok(vec![Node::from(Ranged(Range::From(1)))]));
+    assert_eq!(parse("*{1}"), Ok(vec![make_node(Range::One(1))]));
+    assert_eq!(parse("*{..2}"), Ok(vec![make_node(Range::To(2))]));
+    assert_eq!(parse("*{1..}"), Ok(vec![make_node(Range::From(1))]));
+    assert_eq!(parse("*{1..2}"), Ok(vec![make_node(Range::Both(1, 2))]));
+    assert_eq!(parse("*{..}"), Ok(vec![make_node(Range::All)]));
     assert_eq!(
-        parse("{1..2}"),
-        Ok(vec![Node::from(Ranged(Range::Both(1, 2)))])
-    );
-    assert_eq!(parse("{..}"), Ok(vec![Node::from(Ranged(Range::All))]));
-    assert_eq!(
-        parse("{abc..}"),
+        parse("*{abc..}"),
         Err(ParseError::RangeExpectingInteger(Value::String(
             Cow::Borrowed("abc")
         )))
     );
     assert_eq!(
-        parse("{..abc}"),
+        parse("*{..abc}"),
         Err(ParseError::RangeExpectingInteger(Value::String(
             Cow::Borrowed("abc")
         )))
     );
     assert_eq!(
-        parse("{1.2..}"),
+        parse("*{1.2..}"),
         Err(ParseError::RangeExpectingInteger(Value::FloatingPoing(1.2)))
     );
     assert_eq!(
-        parse("{1..2..}"),
+        parse("*{1..2..}"),
         Err(ParseError::UnexpectedToken(TokenType::DoublePoint))
     );
     assert_eq!(
-        parse("{..2..3}"),
+        parse("*{..2..3}"),
         Err(ParseError::UnexpectedToken(TokenType::DoublePoint))
     );
-    assert_eq!(parse("{1 2}"), Err(ParseError::RangeMissingSeparator));
-    assert_eq!(parse("{}"), Err(ParseError::RangeEmpty));
+    assert_eq!(parse("*{1 2}"), Err(ParseError::RangeMissingSeparator));
+    assert_eq!(parse("*{}"), Err(ParseError::RangeEmpty));
 }

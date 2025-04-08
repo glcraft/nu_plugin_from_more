@@ -15,6 +15,7 @@ pub use value::Value;
 pub struct Node<'a> {
     pub node: NodeKind<'a>,
     pub entries: Option<Entries<'a>>,
+    pub range: Option<Range>,
 }
 
 impl<'a> Display for Node<'a> {
@@ -22,6 +23,9 @@ impl<'a> Display for Node<'a> {
         write!(f, "{}", self.node)?;
         if let Some(entries) = &self.entries {
             write!(f, "{entries}")?;
+        }
+        if let Some(range) = &self.range {
+            write!(f, "{range}")?;
         }
         Ok(())
     }
@@ -32,6 +36,7 @@ impl<'a> From<NodeKind<'a>> for Node<'a> {
         Self {
             node,
             entries: None,
+            range: None,
         }
     }
 }
@@ -46,8 +51,6 @@ pub enum NodeKind<'a> {
     Anywhere,
     /// ".." Parent node
     Parent,
-    /// ranged or indexed selection
-    Ranged(Range),
 }
 
 impl<'a> Display for NodeKind<'a> {
@@ -57,7 +60,6 @@ impl<'a> Display for NodeKind<'a> {
             Self::Any => write!(f, "*"),
             Self::Anywhere => write!(f, "**"),
             Self::Parent => write!(f, ".."),
-            Self::Ranged(range) => range.fmt(f),
             _ => todo!(),
         }
     }
@@ -127,6 +129,16 @@ impl<'a> NodeBuilder<'a> {
         let _ = node.entries.insert(entries);
         Ok(())
     }
+    fn set_range(&mut self, range: Range) -> Result<'a, ()> {
+        let Some(node) = self.0.as_mut() else {
+            return Err(ParseError::MissingNode);
+        };
+        if node.range.is_some() {
+            return Err(ParseError::RangeAlreadyDefined);
+        }
+        let _ = node.range.insert(range);
+        Ok(())
+    }
     fn pop(&mut self) -> Result<'a, Node<'a>> {
         self.0.take().ok_or_else(|| todo!("error missing node"))
     }
@@ -160,7 +172,7 @@ impl<'a> Path<'a> {
                     node_builder.set_entries(Entries::parse_lexer(&mut lexer)?)?
                 }
                 TokenType::EnterCurlyBracket => {
-                    node_builder.set_node(Self::parse_range(&mut lexer).map(NodeKind::Ranged)?)?
+                    node_builder.set_range(Self::parse_range(&mut lexer)?)?
                 }
                 _ => return Err(ParseError::UnexpectedToken(token)),
             }
