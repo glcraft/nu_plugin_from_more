@@ -9,7 +9,7 @@ impl<'a> PartialEq<Entries<'a>> for [KdlEntry] {
                     let Ok(pos): Result<usize, _> = (*position).try_into() else {
                         return false;
                     };
-                    let Some(arg) = self.get(pos) else {
+                    let Some(arg) = self.iter().filter(|v| v.name().is_none()).nth(pos) else {
                         return false;
                     };
                     if value.as_ref().map(|v| arg.value() != v).unwrap_or(false) {
