@@ -1,9 +1,9 @@
 use kdl::{KdlDocument, KdlNode};
-use std::sync::LazyLock;
+use std::{borrow::Cow, sync::LazyLock};
 
 use crate::{
     lexer::Lexer,
-    parser::{Entries, Path},
+    parser::{Entries, EntryKind, Path},
     resolve::Resolver,
 };
 
@@ -14,6 +14,8 @@ static KDL_DOC: LazyLock<KdlDocument> = LazyLock::new(|| {
         node2
         node3 a b c
         node3 0 2 0
+        node_prop hello=world
+        node_prop hello=world 123
         node_prop hello=world foo=bar
         node_children {
             node1 1
@@ -27,7 +29,7 @@ static KDL_DOC: LazyLock<KdlDocument> = LazyLock::new(|| {
             node 4
             node 5
         }
-        node4 {
+        article {
             contents {
                 section "First section" {
                     paragraph "This is the first paragraph"
@@ -35,7 +37,7 @@ static KDL_DOC: LazyLock<KdlDocument> = LazyLock::new(|| {
                 }
             }
             contents {
-                section "First section" {
+                section "Second section" {
                     paragraph "This is the third paragraph"
                     paragraph "This is the forth paragraph"
                 }
@@ -258,6 +260,139 @@ fn query_ranges() {
             TestNode {
                 name: "node",
                 entries: entries("5")
+            },
+        ])
+    );
+}
+#[test]
+fn query_entries() {
+    use crate::parser::Value;
+    assert_eq!(
+        Resolver::resolve(&*KDL_DOC, Path::parse("*[_ 2]").unwrap()),
+        TestNodes(vec![
+            TestNode {
+                name: "node2",
+                entries: entries("1 2 3")
+            },
+            TestNode {
+                name: "node3",
+                entries: entries("0 2 0")
+            },
+        ])
+    );
+    assert_eq!(
+        Resolver::resolve(&*KDL_DOC, Path::parse("*[1=2]").unwrap()),
+        TestNodes(vec![
+            TestNode {
+                name: "node2",
+                entries: entries("1 2 3")
+            },
+            TestNode {
+                name: "node3",
+                entries: entries("0 2 0")
+            },
+        ])
+    );
+    //Note : 3 arguments defined, no matter what are their values
+    assert_eq!(
+        Resolver::resolve(&*KDL_DOC, Path::parse("*[_ _ _]").unwrap()),
+        TestNodes(vec![
+            TestNode {
+                name: "node2",
+                entries: entries("1 2 3")
+            },
+            TestNode {
+                name: "node3",
+                entries: entries("a b c")
+            },
+            TestNode {
+                name: "node3",
+                entries: entries("0 2 0")
+            },
+        ])
+    );
+    assert_eq!(
+        Resolver::resolve(&*KDL_DOC, Path::parse("*[hello=world]").unwrap()),
+        TestNodes(vec![
+            TestNode {
+                name: "node_prop",
+                entries: entries("hello=world")
+            },
+            TestNode {
+                name: "node_prop",
+                entries: entries("hello=world 123")
+            },
+            TestNode {
+                name: "node_prop",
+                entries: entries("hello=world foo=bar")
+            },
+        ])
+    );
+    assert_eq!(
+        Resolver::resolve(&*KDL_DOC, Path::parse("*[hello=world foo=bar]").unwrap()),
+        TestNodes(vec![TestNode {
+            name: "node_prop",
+            entries: entries("hello=world foo=bar")
+        },])
+    );
+    // Just a test to see that the entries parser works well here
+    assert_eq!(
+        Resolver::resolve(&*KDL_DOC, Path::parse("*[hello=world 123]").unwrap()),
+        TestNodes(vec![TestNode {
+            name: "node_prop",
+            entries: Entries::from(vec![
+                EntryKind::Property {
+                    name: Cow::Borrowed("hello"),
+                    value: Some(Value::String(Cow::Borrowed("world")))
+                },
+                EntryKind::Argument {
+                    position: 0,
+                    value: Some(Value::Integer(123))
+                }
+            ])
+        },])
+    );
+    assert_eq!(
+        Resolver::resolve(&*KDL_DOC, Path::parse("*[hello=world foo=bar]").unwrap()),
+        TestNodes(vec![TestNode {
+            name: "node_prop",
+            entries: entries("hello=world foo=bar")
+        },])
+    );
+    assert_eq!(
+        Resolver::resolve(
+            &*KDL_DOC,
+            Path::parse("article/contents/section/paragraph[\"This is the first paragraph\"]")
+                .unwrap()
+        ),
+        TestNodes(vec![TestNode {
+            name: "paragraph",
+            entries: entries("\"This is the first paragraph\"")
+        },])
+    );
+    assert_eq!(
+        Resolver::resolve(
+            &*KDL_DOC,
+            Path::parse("*/*/*/*[\"This is the third paragraph\"]").unwrap()
+        ),
+        TestNodes(vec![TestNode {
+            name: "paragraph",
+            entries: entries("\"This is the third paragraph\"")
+        },])
+    );
+    assert_eq!(
+        Resolver::resolve(
+            &*KDL_DOC,
+            Path::parse("article/contents/section[\"Second section\"]/*").unwrap()
+        ),
+        TestNodes(vec![
+            TestNode {
+                name: "paragraph",
+                entries: entries("\"This is the third paragraph\"")
+            },
+            TestNode {
+                name: "paragraph",
+                entries: entries("\"This is the forth paragraph\"")
             },
         ])
     );
