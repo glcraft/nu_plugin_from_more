@@ -158,12 +158,107 @@ fn query_parent_node_multi() {
     );
 }
 #[test]
-fn query_range() {
+fn query_ranges() {
     assert_eq!(
-        Resolver::resolve(&*KDL_DOC, Path::parse("node_multiple/{1}").unwrap()),
+        Resolver::resolve(&*KDL_DOC, Path::parse("node_multiple/*{1}").unwrap()),
         TestNodes(vec![TestNode {
             name: "node",
             entries: entries("2")
         },])
+    );
+    assert_eq!(
+        Resolver::resolve(&*KDL_DOC, Path::parse("node_multiple/..{0}").unwrap()),
+        TestNodes(vec![TestNode {
+            name: "node_multiple",
+            entries: Entries::new()
+        },])
+    );
+    assert_eq!(
+        Resolver::resolve(&*KDL_DOC, Path::parse("node2/..{1}").unwrap()),
+        TestNodes(vec![])
+    );
+
+    assert_eq!(
+        Resolver::resolve(&*KDL_DOC, Path::parse("node_multiple/node{1}").unwrap()),
+        TestNodes(vec![TestNode {
+            name: "node",
+            entries: entries("2")
+        },])
+    );
+    assert_eq!(
+        Resolver::resolve(&*KDL_DOC, Path::parse("node_multiple/node{1..}").unwrap()),
+        TestNodes(vec![
+            TestNode {
+                name: "node",
+                entries: entries("2")
+            },
+            TestNode {
+                name: "node",
+                entries: entries("3")
+            },
+            TestNode {
+                name: "node",
+                entries: entries("4")
+            },
+            TestNode {
+                name: "node",
+                entries: entries("5")
+            },
+        ])
+    );
+    assert_eq!(
+        Resolver::resolve(&*KDL_DOC, Path::parse("node_multiple/node{..3}").unwrap()),
+        TestNodes(vec![
+            TestNode {
+                name: "node",
+                entries: entries("1")
+            },
+            TestNode {
+                name: "node",
+                entries: entries("2")
+            },
+            TestNode {
+                name: "node",
+                entries: entries("3")
+            },
+        ])
+    );
+    assert_eq!(
+        Resolver::resolve(&*KDL_DOC, Path::parse("node_multiple/node{1..3}").unwrap()),
+        TestNodes(vec![
+            TestNode {
+                name: "node",
+                entries: entries("2")
+            },
+            TestNode {
+                name: "node",
+                entries: entries("3")
+            },
+        ])
+    );
+    assert_eq!(
+        Resolver::resolve(&*KDL_DOC, Path::parse("node_multiple/node{..}").unwrap()),
+        TestNodes(vec![
+            TestNode {
+                name: "node",
+                entries: entries("1")
+            },
+            TestNode {
+                name: "node",
+                entries: entries("2")
+            },
+            TestNode {
+                name: "node",
+                entries: entries("3")
+            },
+            TestNode {
+                name: "node",
+                entries: entries("4")
+            },
+            TestNode {
+                name: "node",
+                entries: entries("5")
+            },
+        ])
     );
 }

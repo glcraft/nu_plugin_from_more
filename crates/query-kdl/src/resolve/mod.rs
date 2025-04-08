@@ -3,7 +3,7 @@ mod ops;
 mod tests;
 use kdl::{KdlDocument, KdlEntry, KdlNode};
 
-use crate::parser::{Node as QueryNode, NodeKind, Path};
+use crate::parser::{Node as QueryNode, NodeKind, Path, RangedIterator};
 
 struct Resolver<'k> {
     current_nodes: Vec<&'k KdlNode>,
@@ -33,42 +33,41 @@ impl<'k> Resolver<'k> {
                 .map(|query_entries| entries == query_entries)
                 .unwrap_or(true)
         };
+        let node_compare_entries = |node: &&KdlNode| compare_entries(node.entries());
 
         match &query_node.node {
             NodeKind::Named(query_name) => {
-                let it = it_nodes.filter(|kdl_node| {
-                    kdl_node
-                        .name()
-                        .repr()
-                        .map(|node_name| node_name == query_name)
-                        .unwrap_or(false)
-                        && compare_entries(kdl_node.entries())
-                });
+                let it = it_nodes
+                    .filter(|kdl_node| {
+                        kdl_node
+                            .name()
+                            .repr()
+                            .map(|node_name| node_name == query_name)
+                            .unwrap_or(false)
+                            && compare_entries(kdl_node.entries())
+                    })
+                    .ranged(query_node.range.as_ref());
                 self.dispatch(query_next, it);
             }
-            NodeKind::Any => self.dispatch(query_next, it_nodes),
+            NodeKind::Any => self.dispatch(
+                query_next,
+                it_nodes
+                    .filter(node_compare_entries)
+                    .ranged(query_node.range.as_ref()),
+            ),
             NodeKind::Anywhere => todo!(),
             NodeKind::Parent => {
                 let Some(parent) = self.current_nodes.pop() else {
                     return;
                 };
-                self.dispatch(query_next, std::iter::once(parent));
+                self.dispatch(
+                    query_next,
+                    std::iter::once(parent)
+                        .filter(node_compare_entries)
+                        .ranged(query_node.range.as_ref()),
+                );
                 self.current_nodes.push(parent);
             }
-            NodeKind::Ranged(range) => match range {
-                crate::parser::Range::One(index) => {
-                    self.dispatch(query_next, it_nodes.skip(*index as _).take(1))
-                }
-                crate::parser::Range::From(from) => {
-                    self.dispatch(query_next, it_nodes.skip(*from as _))
-                }
-                crate::parser::Range::To(to) => self.dispatch(query_next, it_nodes.take(*to as _)),
-                crate::parser::Range::Both(from, to) => self.dispatch(
-                    query_next,
-                    it_nodes.skip(*from as _).take((*to - *from) as _),
-                ),
-                crate::parser::Range::All => self.dispatch(query_next, it_nodes),
-            },
         }
     }
     fn dispatch<'q>(
