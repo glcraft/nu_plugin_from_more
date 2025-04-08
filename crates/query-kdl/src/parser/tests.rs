@@ -37,15 +37,15 @@ fn entries() {
         Ok(Entries::from(vec![
             EntryKind::Argument {
                 position: 0,
-                value: Value::Integer(1)
+                value: Some(Value::Integer(1))
             },
             EntryKind::Argument {
                 position: 1,
-                value: Value::Integer(2)
+                value: Some(Value::Integer(2))
             },
             EntryKind::Argument {
                 position: 2,
-                value: Value::Integer(3)
+                value: Some(Value::Integer(3))
             },
         ]))
     );
@@ -54,15 +54,15 @@ fn entries() {
         Ok(Entries::from(vec![
             EntryKind::Argument {
                 position: 0,
-                value: Value::Integer(1)
+                value: Some(Value::Integer(1))
             },
             EntryKind::Argument {
                 position: 1,
-                value: Value::String(Cow::Borrowed("abc"))
+                value: Some(Value::String(Cow::Borrowed("abc")))
             },
             EntryKind::Argument {
                 position: 2,
-                value: Value::FloatingPoing(3.14)
+                value: Some(Value::FloatingPoing(3.14))
             },
         ]))
     );
@@ -71,11 +71,11 @@ fn entries() {
         Ok(Entries::from(vec![
             EntryKind::Property {
                 name: Cow::Borrowed("a"),
-                value: Value::String(Cow::Borrowed("b"))
+                value: Some(Value::String(Cow::Borrowed("b")))
             },
             EntryKind::Property {
                 name: Cow::Borrowed("c"),
-                value: Value::String(Cow::Borrowed("d"))
+                value: Some(Value::String(Cow::Borrowed("d")))
             },
         ]))
     );
@@ -84,15 +84,15 @@ fn entries() {
         Ok(Entries::from(vec![
             EntryKind::Property {
                 name: Cow::Borrowed("name1"),
-                value: Value::Integer(123)
+                value: Some(Value::Integer(123))
             },
             EntryKind::Property {
                 name: Cow::Borrowed("name2"),
-                value: Value::String(Cow::Borrowed("abc"))
+                value: Some(Value::String(Cow::Borrowed("abc")))
             },
             EntryKind::Property {
                 name: Cow::Borrowed("name3"),
-                value: Value::FloatingPoing(3.14)
+                value: Some(Value::FloatingPoing(3.14))
             },
         ]))
     );
@@ -101,15 +101,15 @@ fn entries() {
         Ok(Entries::from(vec![
             EntryKind::Argument {
                 position: 1,
-                value: Value::Integer(123)
+                value: Some(Value::Integer(123))
             },
             EntryKind::Argument {
                 position: 2,
-                value: Value::String(Cow::Borrowed("abc"))
+                value: Some(Value::String(Cow::Borrowed("abc")))
             },
             EntryKind::Argument {
                 position: 3,
-                value: Value::FloatingPoing(3.14)
+                value: Some(Value::FloatingPoing(3.14))
             },
         ]))
     );
@@ -120,35 +120,35 @@ fn entries() {
         Ok(Entries::from(vec![
             EntryKind::Argument {
                 position: 0,
-                value: Value::Integer(1)
+                value: Some(Value::Integer(1))
             },
             EntryKind::Argument {
                 position: 1,
-                value: Value::Integer(2)
+                value: Some(Value::Integer(2))
             },
             EntryKind::Argument {
                 position: 2,
-                value: Value::Integer(3)
+                value: Some(Value::Integer(3))
             },
             EntryKind::Property {
                 name: Cow::Borrowed("a"),
-                value: Value::Integer(4)
+                value: Some(Value::Integer(4))
             },
             EntryKind::Property {
                 name: Cow::Borrowed("b"),
-                value: Value::Integer(5)
+                value: Some(Value::Integer(5))
             },
             EntryKind::Property {
                 name: Cow::Borrowed("p r o p"),
-                value: Value::String(Cow::Borrowed("v a l u e"))
+                value: Some(Value::String(Cow::Borrowed("v a l u e")))
             },
             EntryKind::Argument {
                 position: 3,
-                value: Value::Integer(6)
+                value: Some(Value::Integer(6))
             },
             EntryKind::Argument {
                 position: 10,
-                value: Value::Integer(7)
+                value: Some(Value::Integer(7))
             },
         ]))
     );
@@ -291,7 +291,7 @@ fn nodes_with_entries() {
                     node: NodeKind::Parent,
                     entries: Some(Entries::from(vec![EntryKind::Argument {
                         position: 0,
-                        value: Value::Integer(1)
+                        value: Some(Value::Integer(1))
                     },])),
                     range: None,
                 },
@@ -299,7 +299,7 @@ fn nodes_with_entries() {
                     node: NodeKind::Named(Cow::Borrowed("node1")),
                     entries: Some(Entries::from(vec![EntryKind::Argument {
                         position: 0,
-                        value: Value::Integer(2)
+                        value: Some(Value::Integer(2))
                     },])),
                     range: None,
                 },
@@ -307,7 +307,7 @@ fn nodes_with_entries() {
                     node: NodeKind::Any,
                     entries: Some(Entries::from(vec![EntryKind::Argument {
                         position: 0,
-                        value: Value::Integer(3)
+                        value: Some(Value::Integer(3))
                     },])),
                     range: None,
                 },
@@ -315,7 +315,7 @@ fn nodes_with_entries() {
                     node: NodeKind::Anywhere,
                     entries: Some(Entries::from(vec![EntryKind::Argument {
                         position: 0,
-                        value: Value::Integer(4)
+                        value: Some(Value::Integer(4))
                     },])),
                     range: None,
                 },

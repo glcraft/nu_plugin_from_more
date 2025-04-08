@@ -12,9 +12,9 @@ impl<'a> PartialEq<Entries<'a>> for [KdlEntry] {
                     let Some(arg) = self.get(pos) else {
                         return false;
                     };
-                    if arg.value() != value {
+                    if value.as_ref().map(|v| arg.value() != v).unwrap_or(false) {
                         return false;
-                    }
+                    };
                 }
                 EntryKind::Property { name, value } => {
                     let Some(prop) = self
@@ -25,7 +25,7 @@ impl<'a> PartialEq<Entries<'a>> for [KdlEntry] {
                     else {
                         return false;
                     };
-                    if prop.value() != value {
+                    if value.as_ref().map(|v| prop.value() != v).unwrap_or(false) {
                         return false;
                     }
                 }

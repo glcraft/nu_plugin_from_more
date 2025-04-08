@@ -6,11 +6,11 @@ use std::{borrow::Cow, fmt::Display};
 pub enum EntryKind<'a> {
     Argument {
         position: u64,
-        value: Value<'a>,
+        value: Option<Value<'a>>,
     },
     Property {
         name: Cow<'a, str>,
-        value: Value<'a>,
+        value: Option<Value<'a>>,
     },
 }
 
@@ -22,11 +22,23 @@ impl<'a> Display for Entries<'a> {
         write!(f, "[ ")?;
         for (i, v) in self.0.iter().enumerate() {
             match v {
-                EntryKind::Argument { position, value } if i != (*position as _) => {
-                    write!(f, "{}={} ", position, value)
-                }
-                EntryKind::Argument { value, .. } => write!(f, "{} ", value),
-                EntryKind::Property { name, value } => write!(f, "{}={} ", name, value), // TODO: quote string if not alphanumeric
+                EntryKind::Argument { position, value } if i != (*position as _) => write!(
+                    f,
+                    "{}={}",
+                    position,
+                    value.as_ref().unwrap_or(&Value::String(Cow::Borrowed("_")))
+                ),
+                EntryKind::Argument { value, .. } => write!(
+                    f,
+                    "{} ",
+                    value.as_ref().unwrap_or(&Value::String(Cow::Borrowed("_")))
+                ),
+                EntryKind::Property { name, value } => write!(
+                    f,
+                    "{}={} ",
+                    name,
+                    value.as_ref().unwrap_or(&Value::String(Cow::Borrowed("_")))
+                ), // TODO: quote string if not alphanumeric
             }?;
         }
         write!(f, "]")
@@ -52,11 +64,14 @@ impl<'a> Entries<'a> {
                 TokenType::LeaveSquareBracket => break,
                 TokenType::Alphanumeric(s) => {
                     is_unnamed_arg = true;
-                    string::parse_alphanumeric(s).map_err(|e| e.into_parse_error(s))?
+                    let v = string::parse_alphanumeric(s).map_err(|e| e.into_parse_error(s))?;
+                    (!matches!(v, Value::String(ref s) if s == "_")).then(|| v)
                 }
                 TokenType::String(s) => {
                     is_unnamed_arg = true;
-                    Value::String(string::parse_string(s).map_err(|e| e.into_parse_error(s))?)
+                    Some(Value::String(
+                        string::parse_string(s).map_err(|e| e.into_parse_error(s))?,
+                    ))
                 }
                 TokenType::Equal => {
                     if prop_name.is_some() {
@@ -76,12 +91,13 @@ impl<'a> Entries<'a> {
                 t => return Err(ParseError::UnexpectedToken(t)),
             };
             match prop_name {
-                Some(Value::String(name)) => {
+                Some(None) => return Err(ParseError::UndefinedEntryIdentifier),
+                Some(Some(Value::String(name))) => {
                     entries.push(EntryKind::Property { name, value });
                     prop_name = None;
                     is_unnamed_arg = false;
                 }
-                Some(Value::Integer(position)) => {
+                Some(Some(Value::Integer(position))) => {
                     entries.push(EntryKind::Argument {
                         position: position as _,
                         value,
@@ -89,7 +105,7 @@ impl<'a> Entries<'a> {
                     prop_name = None;
                     is_unnamed_arg = false;
                 }
-                Some(s @ _) => return Err(ParseError::UnexpectedEntryIdentifier(s)),
+                Some(Some(s @ _)) => return Err(ParseError::UnexpectedEntryIdentifier(s)),
                 None => {
                     entries.push(EntryKind::Argument {
                         position: arg_pos,

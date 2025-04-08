@@ -46,6 +46,8 @@ pub enum ParseError<'a> {
     MissingEntryValue,
     #[error("entry must be identified by string (property name) or integer number (argument index), got {0}")]
     UnexpectedEntryIdentifier(Value<'a>),
+    #[error("use of _ joker in entry identifier")]
+    UndefinedEntryIdentifier,
     #[error("missing entry identifier")]
     MissingEntryIdentifier,
     #[error("markers like root or anywhere can't have entries")]
