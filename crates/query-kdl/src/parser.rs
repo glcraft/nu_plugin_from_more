@@ -65,6 +65,25 @@ impl<'a> Display for NodeKind<'a> {
     }
 }
 
+pub trait RangedIterator
+where
+    Self: Iterator + Sized,
+{
+    fn ranged(self, range: Option<&Range>) -> impl Iterator<Item = <Self as Iterator>::Item> {
+        let Some(range) = range else {
+            return self.skip(0).take(usize::MAX);
+        };
+        match range {
+            Range::One(index) => self.skip(*index as _).take(1),
+            Range::From(from) => self.skip(*from as _).take(usize::MAX),
+            Range::To(to) => self.skip(0).take(*to as _),
+            Range::Both(from, to) => self.skip(*from as _).take((*to - *from) as _),
+            Range::All => self.skip(0).take(usize::MAX),
+        }
+    }
+}
+impl<I> RangedIterator for I where I: Iterator {}
+
 #[derive(Clone, PartialEq, Debug)]
 pub enum Range {
     /// {i}
