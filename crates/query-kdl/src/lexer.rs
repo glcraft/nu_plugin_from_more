@@ -67,7 +67,7 @@ impl<'a> Iterator for Lexer<'a> {
         match c_token {
             None => None,
             Some('"' | '\'') => self.get_text(),
-            Some(c) if c.is_alphanumeric() => self.get_alphanumeric(),
+            Some(c) if c.is_alphanumeric() || c == '_' => self.get_alphanumeric(),
             Some(_) => self.get_token(),
         }
     }
