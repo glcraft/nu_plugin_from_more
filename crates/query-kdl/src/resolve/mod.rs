@@ -1,3 +1,4 @@
+mod iter;
 mod ops;
 #[cfg(test)]
 mod tests;
