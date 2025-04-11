@@ -2,13 +2,12 @@ use std::ops::Index;
 
 use kdl::KdlNode;
 use std::iter;
-
-type IterChildren<'a> =
-    iter::Map<std::slice::Iter<'a, KdlNode>, fn(&'a KdlNode) -> AnywhereIter<'a>>;
+type IterNodes<'a> =
+    std::iter::Map<std::slice::Iter<'a, KdlNode>, fn(&'a KdlNode) -> AnywhereIter<'a>>;
 #[derive(Clone, Debug)]
 enum AnywhereIter<'a> {
     Node(&'a KdlNode),
-    Children(Vec<AnywhereIter<'a>>, &AnywhereIter<'a>, usize),
+    Children(IterNodes<'a>, Box<AnywhereIter<'a>>),
     End,
 }
 
@@ -21,27 +20,22 @@ impl<'a> Iterator for AnywhereIter<'a> {
                 kdl_node
                     .children()
                     .map(|kdl_doc| {
-                        let i: IterChildren = kdl_doc.nodes().iter().map(AnywhereIter::Node);
-                        AnywhereIter::Children(
-                            kdl_doc
-                                .nodes()
-                                .iter()
-                                .map(|v| AnywhereIter::Node(v))
-                                .collect(),
-                            0,
-                        )
+                        let i: IterNodes = kdl_doc.nodes().iter().map(AnywhereIter::Node);
+                        let mut it = kdl_doc.nodes().iter();
+                        let Some(child) = it.next().map(AnywhereIter::Node) else {
+                            return AnywhereIter::End;
+                        };
+                        AnywhereIter::Children(it, Box::new(child))
                     })
                     .unwrap_or(AnywhereIter::End),
                 Some(kdl_node),
             ),
-            AnywhereIter::Children(kdl_nodes, index) => (
-                if index < kdl_nodes.len() {
-                    AnywhereIter::Children(kdl_nodes, index + 1)
-                } else {
-                    AnywhereIter::End
-                },
-                todo!(),
-            ),
+            AnywhereIter::Children(ref mut it_nodes, ref mut actual) => {
+                if let Some(kdl_node) = actual.next() {
+                    return Some(kdl_node);
+                }
+                todo!()
+            }
             AnywhereIter::End => (AnywhereIter::End, None),
         };
         *self = new_self;
