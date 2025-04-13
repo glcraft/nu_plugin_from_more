@@ -2,9 +2,9 @@ mod iter;
 mod ops;
 #[cfg(test)]
 mod tests;
-use kdl::{KdlDocument, KdlEntry, KdlNode};
-
 use crate::parser::{Node as QueryNode, NodeKind, Path, RangedIterator};
+use iter::AnywhereIterator;
+use kdl::{KdlDocument, KdlEntry, KdlNode};
 
 struct Resolver<'k> {
     current_nodes: Vec<&'k KdlNode>,
@@ -56,7 +56,7 @@ impl<'k> Resolver<'k> {
                     .filter(node_compare_entries)
                     .ranged(query_node.range.as_ref()),
             ),
-            NodeKind::Anywhere => todo!(),
+            NodeKind::Anywhere => self.dispatch(query_next, it_nodes.anywhere_nodes()),
             NodeKind::Parent => {
                 let Some(parent) = self.current_nodes.pop() else {
                     return;
