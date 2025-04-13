@@ -397,3 +397,64 @@ fn query_entries() {
         ])
     );
 }
+#[test]
+fn query_anywhere() {
+    assert_eq!(
+        Resolver::resolve(&*KDL_DOC, Path::parse("article/**").unwrap()),
+        TestNodes(vec![
+            TestNode {
+                name: "contents",
+                entries: Entries::default()
+            },
+            TestNode {
+                name: "section",
+                entries: entries("\"First section\"")
+            },
+            TestNode {
+                name: "paragraph",
+                entries: entries("\"This is the first paragraph\"")
+            },
+            TestNode {
+                name: "paragraph",
+                entries: entries("\"This is the second paragraph\"")
+            },
+            TestNode {
+                name: "contents",
+                entries: Entries::default()
+            },
+            TestNode {
+                name: "section",
+                entries: entries("\"Second section\"")
+            },
+            TestNode {
+                name: "paragraph",
+                entries: entries("\"This is the third paragraph\"")
+            },
+            TestNode {
+                name: "paragraph",
+                entries: entries("\"This is the forth paragraph\"")
+            },
+        ])
+    );
+    assert_eq!(
+        Resolver::resolve(&*KDL_DOC, Path::parse("article/**/paragraph").unwrap()),
+        TestNodes(vec![
+            TestNode {
+                name: "paragraph",
+                entries: entries("\"This is the first paragraph\"")
+            },
+            TestNode {
+                name: "paragraph",
+                entries: entries("\"This is the second paragraph\"")
+            },
+            TestNode {
+                name: "paragraph",
+                entries: entries("\"This is the third paragraph\"")
+            },
+            TestNode {
+                name: "paragraph",
+                entries: entries("\"This is the forth paragraph\"")
+            },
+        ])
+    );
+}
