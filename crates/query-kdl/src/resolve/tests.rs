@@ -457,4 +457,17 @@ fn query_anywhere() {
             },
         ])
     );
+    assert_eq!(
+        Resolver::resolve(&*KDL_DOC, Path::parse("**/*[2]").unwrap()),
+        TestNodes(vec![
+            TestNode {
+                name: "node2",
+                entries: entries("2")
+            },
+            TestNode {
+                name: "node",
+                entries: entries("2")
+            },
+        ])
+    );
 }
