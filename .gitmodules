@@ -1,0 +1,3 @@
+[submodule "crates/query-kdl"]
+	path = crates/query-kdl
+	url = git@github.com:glcraft/query-kdl.git
