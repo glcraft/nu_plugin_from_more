@@ -4,8 +4,8 @@ version = "0.1.2"
 edition = "2021"
 
 [dependencies]
-nu-plugin = "0.102.0"
-nu-protocol = "0.102.0"
+nu-plugin = "0.104.0"
+nu-protocol = "0.104.0"
 thiserror = "2.0.9"
 miette = "7.4.0"
 
