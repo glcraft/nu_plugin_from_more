@@ -1,13 +1,14 @@
-mod lexer;
-mod parser;
 use super::FromMorePlugin;
 use kdl::{KdlDocument, KdlEntry, KdlNode, KdlValue};
+use miette::private::new_adhoc;
 use miette::NarratableReportHandler;
 use nu_plugin::EvaluatedCall;
 use nu_plugin::{EngineInterface, PluginCommand, SimplePluginCommand};
 use nu_protocol::{LabeledError, Record, Signature, Span, SyntaxShape, Type, Value as NuValue};
-// use query_kdl::Path;
+use query_kdl::parser::Path;
 use std::collections::HashMap;
+use std::fmt::Write;
+use std::str::FromStr;
 
 pub struct QueryKdl;
 
@@ -54,18 +55,30 @@ impl SimplePluginCommand for QueryKdl {
                 query_span,
             ));
         };
-        // let query = parser::Path::parse(&query_str).map_err(|e| {
-        //     LabeledError::new("Failed to parse query").with_label(e.to_string(), query_span)
-        // })?;
+        let query = Path::parse(&query_str).map_err(|e| {
+            LabeledError::new("Failed to parse query").with_label(e.to_string(), query_span)
+        })?;
 
-        // let kdoc = match KdlDocument::parse(input) {
-        //     Ok(v) => v,
-        //     Err(e) => {
-        //         return Err(LabeledError::new("Failed to parse KDL format")
-        //             .with_label(e.to_string(), call.head))
-        //     }
-        // };
-        todo!()
+        let kdoc = match KdlDocument::parse(input) {
+            Ok(v) => v,
+            Err(e) => {
+                return Err(LabeledError::new("Failed to parse KDL format")
+                    .with_label(e.to_string(), call.head))
+            }
+        };
+        let nodes = query.resolve(&kdoc);
+        let mut str_result = String::new();
+        for node in nodes {
+            if let Err(e) = write!(str_result, "{}\n", node) {
+                return Err(
+                    LabeledError::new(e.to_string()).with_label("string writing error", call.head)
+                );
+            }
+        }
+        let mut new_doc = KdlDocument::from_str(&str_result).unwrap();
+        new_doc.autoformat();
+        let str_result = new_doc.to_string();
+        Ok(NuValue::string(str_result, Span::unknown()))
     }
 }
 
